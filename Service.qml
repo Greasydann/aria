@@ -3539,12 +3539,17 @@ Item {
       return
     }
     var nextState = playing ? "pause" : "play"
+    showMediaOsd(nextState)
+    if (soloistDevice() || !hasLocalPlayer) {
+      var bin = "/home/dann/.local/bin/soloist"
+      Quickshell.execDetached(["sh", "-c",
+        bin + " ctl now 2>&1 | grep -q '\\bplaying\\b' && " + bin + " ctl pause || " + bin + " ctl play"])
+      if (soloistDevice()) return
+    }
     if (!useRemotePlayback && hasLocalPlayer && activePlayer.canTogglePlaying) {
       activePlayer.togglePlaying()
-      showMediaOsd(nextState)
       return
     }
-    showMediaOsd(nextState)
     remotePlayerAction("PUT", playing ? "/me/player/pause" : "/me/player/play",
       controlQuery())
   }
