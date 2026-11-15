@@ -3503,7 +3503,10 @@ Item {
   }
 
   function showMediaOsd(state, text) {
-    var icon = state === "play" ? "media-play" : (state === "pause" ? "media-pause" : "media")
+    var icon = state === "play" ? "media-play"
+      : (state === "pause" ? "media-pause"
+      : (state === "next" ? "media-next"
+      : (state === "previous" ? "media-previous" : "media")))
     var message = String(text || title || "")
     Quickshell.execDetached(["omarchy-osd", "-i", icon, "-m", message])
   }
