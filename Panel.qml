@@ -6517,12 +6517,30 @@ Item {
             width: parent.width
             spacing: Style.space(7)
 
-            Text {
-              text: "PREFERENCES"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
+            Row {
+              width: parent.width
+              spacing: Style.space(8)
+
+              Text {
+                id: preferencesLabel
+                text: "PREFERENCES"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.bold: true
+                anchors.verticalCenter: parent.verticalCenter
+              }
+
+              Item { width: Math.max(0, parent.width - preferencesLabel.implicitWidth - saveSettingsButton.implicitWidth - parent.spacing); height: 1 }
+
+              Button {
+                id: saveSettingsButton
+                text: "Save settings"
+                iconText: "󰆓"
+                foreground: root.foreground
+                tooltipText: "Save all preferences"
+                onClicked: root.saveSettings(true)
+              }
             }
 
             Text {
@@ -6551,9 +6569,12 @@ Item {
                 TextField {
                   width: parent.width
                   foreground: root.foreground
-                  placeholderText: "Omarchy Spotify"
+                  placeholderText: "Spoty"
                   text: root.draftDeviceName
-                  onTextEdited: root.draftDeviceName = text
+                  onTextEdited: {
+                    root.draftDeviceName = text
+                    root.persistDraftSettings()
+                  }
                   onEditingFinished: root.persistDraftSettings()
                 }
               }
@@ -6575,7 +6596,10 @@ Item {
                   placeholderText: "15"
                   text: root.draftIdleMinutes
                   validator: IntValidator { bottom: 0; top: 1440 }
-                  onTextEdited: root.draftIdleMinutes = text
+                  onTextEdited: {
+                    root.draftIdleMinutes = text
+                    root.persistDraftSettings()
+                  }
                   onEditingFinished: root.persistDraftSettings()
                 }
               }
