@@ -2678,6 +2678,7 @@ Item {
           // /me/player is the freshest source for the active receiver. The
           // separately cached device list is only a fallback when that value
           // is unknown; otherwise it can undo an accepted volume command.
+          var localVolumePreferred = apiDevice && apiDevice.local === true
           if (!localVolumePreferred && currentVolume === null)
             rememberRemoteVolume(current, apiDevice.volumePercent)
           apiDevice.restricted = current.restricted === true
