@@ -73,6 +73,53 @@ Item {
     }
     return null
   }
+
+  function officialSpotifyMprisPlayer() {
+    for (var i = 0; i < mprisPlayers.length; i++) {
+      if (isOfficialSpotifyPlayer(mprisPlayers[i])) return mprisPlayers[i]
+    }
+    return null
+  }
+
+  // Official Spotify desktop Connect device (hybrid local playback target).
+  function officialSpotifyConnectDevice() {
+    if (!devices || !devices.length) return null
+    var fallback = null
+    for (var i = 0; i < devices.length; i++) {
+      var device = devices[i]
+      if (!device || !device.id) continue
+      if (isSoloistName(device.sourceName || device.name)) continue
+      if (Api.isLocalPlaybackDevice(device, deviceName,
+            localRuntimeDeviceName, localDeviceId)) continue
+      var type = String(device.type || "").toLowerCase()
+      if (type !== "computer") continue
+      if (device.active) return device
+      if (!fallback) fallback = device
+    }
+    if (fallback) return fallback
+    if (officialSpotifyMprisPlayer()) {
+      for (var j = 0; j < devices.length; j++) {
+        var d = devices[j]
+        if (d && d.id && !isSoloistName(d.sourceName || d.name)
+            && !Api.isLocalPlaybackDevice(d, deviceName, localRuntimeDeviceName, localDeviceId))
+          return d
+      }
+    }
+    return null
+  }
+
+  function ensureOfficialSpotifyRunningHidden() {
+    if (officialSpotifyMprisPlayer() || officialSpotifyConnectDevice()) return true
+    Quickshell.execDetached(["sh", "-c",
+      "spotify-launcher >/dev/null 2>&1 & "
+      + "for i in $(seq 1 20); do "
+      + "  hyprctl dispatch movetoworkspacesilent special:spoty,class:^(Spotify|spotify)$ >/dev/null 2>&1; "
+      + "  sleep 0.4; "
+      + "done"])
+    statusClearTimer.stop()
+    statusMessage = "Starting Spotify in background… open it once to sign in if needed"
+    return false
+  }
   readonly property int idleShutdownMinutes: Math.max(0, Math.min(1440,
     Math.floor(Number(settings.idleShutdownMinutes) || 0)))
   readonly property bool showMiniPlayer: String(settings.showMiniPlayer || "On") !== "Off"
@@ -475,6 +522,7 @@ Item {
     && radioContextSelected && playing
   property bool localActivationRequested: false
   property int deviceProbeAttempts: 0
+  property int officialSpotifyLaunchWaitAttempts: 0
   property int localSocketWaitAttempts: 0
   property int visibleLocalDeviceRefreshAttempts: 0
   property bool loginFlowActive: false
@@ -3025,13 +3073,38 @@ Item {
     pendingPlaybackMessage = ""
     pendingPlaybackRadio = null
     pendingPlaybackSerial = 0
+    officialSpotifyLaunchWaitAttempts = 0
     if (keepActivation !== true) localActivationRequested = false
   }
 
   function dispatchPendingPlayback(playbackSerial) {
     if (playbackSerial !== pendingPlaybackSerial || !pendingPlaybackBody) return
     var soloist = soloistDevice()
+    var official = officialSpotifyConnectDevice()
+    var officialMpris = officialSpotifyMprisPlayer()
     var target = autoselectLocalDevice() || chooseDevice()
+
+    // Spoty hybrid: prefer the official Spotify desktop client for local playback.
+    if (official && official.id) {
+      localActivationRequested = false
+      sendPendingPlayback(official.id)
+      return
+    }
+    if (officialMpris) {
+      // Official app is running but not yet visible as a Connect device; refresh and retry.
+      loadDevices()
+      if (!officialSpotifyLaunchWaitAttempts) officialSpotifyLaunchWaitAttempts = 0
+      if (officialSpotifyLaunchWaitAttempts < 10) {
+        officialSpotifyLaunchWaitAttempts++
+        deviceProbeTimer.restart()
+      } else {
+        officialSpotifyLaunchWaitAttempts = 0
+        fail("Spotify is running, but not yet available as a playback device. Try again in a moment.")
+        clearPendingPlayback()
+      }
+      return
+    }
+
     // Prefer Soloist (external Connect device service) for local playback.
     if (soloist && soloist.id && (!target || target.local || isSoloistName(target.sourceName || target.name))) {
       localActivationRequested = false
@@ -3043,17 +3116,28 @@ Item {
       sendPendingPlayback(Api.playbackTargetDeviceId(target, selectedDeviceExplicit))
       return
     }
+
+    // No official client/device available: launch it hidden and wait for it to appear.
+    if (!official && !officialMpris) {
+      ensureOfficialSpotifyRunningHidden()
+      if (!officialSpotifyLaunchWaitAttempts) officialSpotifyLaunchWaitAttempts = 0
+      if (officialSpotifyLaunchWaitAttempts < 25) {
+        officialSpotifyLaunchWaitAttempts++
+        deviceProbeTimer.restart()
+      } else {
+        officialSpotifyLaunchWaitAttempts = 0
+        fail("Open Spotify (spotify-launcher), sign in, then try again for local playback")
+        clearPendingPlayback()
+      }
+      return
+    }
+
     if (!daemonManager.credentialsChecked && (!target || target.local)) {
       fail("Local playback credentials are still being checked. Try again shortly.")
       clearPendingPlayback()
       return
     }
     if (!daemonManager.credentialsAvailable && (!target || target.local)) {
-      if (soloist && soloist.id) {
-        localActivationRequested = false
-        sendPendingPlayback(soloist.id)
-        return
-      }
       fail("Approve playback on this computer in Settings, then try again")
       clearPendingPlayback()
       return
