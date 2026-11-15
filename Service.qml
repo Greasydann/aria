@@ -59,6 +59,20 @@ Item {
   property bool settingsReady: false
 
   readonly property string deviceName: String(settings.deviceName || "Omarchy Spotify").trim() || "Omarchy Spotify"
+  readonly property string soloistDeviceName: "SoloistPC"
+
+  function isSoloistName(name) {
+    var n = String(name || "").trim()
+    return n === soloistDeviceName || n === "OmaSpotify (this PC)"
+  }
+
+  function soloistDevice() {
+    for (var i = 0; i < devices.length; i++) {
+      var d = devices[i]
+      if (isSoloistName(d.sourceName || d.name)) return d
+    }
+    return null
+  }
   readonly property int idleShutdownMinutes: Math.max(0, Math.min(1440,
     Math.floor(Number(settings.idleShutdownMinutes) || 0)))
   readonly property bool showMiniPlayer: String(settings.showMiniPlayer || "On") !== "Off"
@@ -931,6 +945,12 @@ Item {
 
   function ensureVisibleLocalReceiver() {
     if (localPlaybackStopped || daemonManager.terminalFailure) return
+    // Soloist is an external Connect device service; don't auto-start the
+    // built-in local backend for it.
+    if (soloistDevice()) {
+      cancelVisibleLocalDeviceRefresh()
+      return
+    }
     var action = Api.visibleLocalReceiverAction(uiVisible,
       fullyConnected && daemonManager.credentialsAvailable,
       daemonManager.running, daemonManager.busy)
@@ -945,6 +965,10 @@ Item {
 
   function refreshVisibleLocalDevice() {
     if (localPlaybackStopped || daemonManager.terminalFailure) return
+    if (soloistDevice()) {
+      cancelVisibleLocalDeviceRefresh()
+      return
+    }
     var action = Api.visibleLocalReceiverAction(uiVisible,
       fullyConnected && daemonManager.credentialsAvailable,
       daemonManager.running, daemonManager.busy)
@@ -2625,7 +2649,8 @@ Item {
       var item = local[k]
       if (present[String(item.id || "")]) continue
       var rawName = String(item.name || "Spotify Connect device")
-      var isLocal = Api.isLocalPlaybackDevice({ id: item.id, name: rawName },
+      var isSoloist = isSoloistName(rawName)
+      var isLocal = !isSoloist && Api.isLocalPlaybackDevice({ id: item.id, name: rawName },
         deviceName, localRuntimeDeviceName, localDeviceId)
       if (isLocal) {
         localDeviceId = String(item.id || localDeviceId)
@@ -2635,9 +2660,11 @@ Item {
       var currentMatch = !!current && !currentMatched
         && Api.playbackDevicesMatch(item, current)
       if (currentMatch) currentMatched = true
+      // Soloist is a standard Spotify Connect device controlled through the
+      // Web API; the Sonos/local activation handshake does not apply to it.
       next.push({
         id: String(item.id || ""),
-        name: isLocal ? deviceName : rawName,
+        name: (isLocal ? deviceName : rawName),
         sourceName: rawName,
         type: String(item.type || "Speaker"),
         active: currentMatch,
@@ -2648,7 +2675,7 @@ Item {
         supportsVolume: currentMatch && current.supportsVolume === true,
         local: isLocal,
         localDiscovery: true,
-        activationRequired: !currentMatch,
+        activationRequired: isSoloist ? false : !currentMatch,
         activeUser: item.activeUser === true || currentMatch,
         tokenType: Api.spotifyConnectTokenType(item.tokenType),
         brand: String(item.brand || ""),
@@ -2896,7 +2923,7 @@ Item {
     selectedDeviceId = device.id
     selectedDeviceExplicit = true
     noteActivity()
-    if (device.activationRequired) {
+    if (device.activationRequired && !isSoloistName(device.sourceName || device.name)) {
       if (deviceActivationBusy) return
       pendingConnectDeviceId = device.id
       connectActivationAttempts = 0
@@ -2987,7 +3014,14 @@ Item {
 
   function dispatchPendingPlayback(playbackSerial) {
     if (playbackSerial !== pendingPlaybackSerial || !pendingPlaybackBody) return
+    var soloist = soloistDevice()
     var target = autoselectLocalDevice() || chooseDevice()
+    // Prefer Soloist (external Connect device service) for local playback.
+    if (soloist && soloist.id && (!target || target.local || isSoloistName(target.sourceName || target.name))) {
+      localActivationRequested = false
+      sendPendingPlayback(soloist.id)
+      return
+    }
     if (target && !target.local) {
       localActivationRequested = false
       sendPendingPlayback(Api.playbackTargetDeviceId(target, selectedDeviceExplicit))
@@ -2999,6 +3033,11 @@ Item {
       return
     }
     if (!daemonManager.credentialsAvailable && (!target || target.local)) {
+      if (soloist && soloist.id) {
+        localActivationRequested = false
+        sendPendingPlayback(soloist.id)
+        return
+      }
       fail("Approve playback on this computer in Settings, then try again")
       clearPendingPlayback()
       return
@@ -3097,6 +3136,14 @@ Item {
     if (!pendingPlayback && !localActivationRequested) return
     loadDevices(function() {
       if (!root.pendingPlayback && !root.localActivationRequested) return
+      var soloist = root.soloistDevice()
+      if (soloist && soloist.id) {
+        root.localActivationRequested = false
+        root.deviceProbeAttempts = 0
+        if (root.pendingPlayback)
+          root.sendPendingPlayback(soloist.id)
+        return
+      }
       var target = root.pendingPlayback
         ? (root.autoselectLocalDevice() || root.chooseDevice()) : null
       if (target && !target.local) {
@@ -3121,7 +3168,9 @@ Item {
       if (root.deviceProbeAttempts < 8) deviceProbeTimer.restart()
       else {
         root.clearPendingPlayback()
-        root.fail("Playback on this computer did not become available. Reconnect Spotify in Settings, then try again")
+        root.fail(soloist
+          ? "SoloistPC was not available to Spotify. Make sure Soloist is running and logged in, then try again."
+          : "Playback on this computer did not become available. Reconnect Spotify in Settings, then try again")
       }
     })
   }
@@ -3568,6 +3617,11 @@ Item {
     noteActivity()
     localActivationRequested = true
     deviceProbeAttempts = 0
+    var soloist = soloistDevice()
+    if (soloist && soloist.id) {
+      deviceProbeTimer.restart()
+      return
+    }
     daemonManager.start(true)
     deviceProbeTimer.restart()
   }
@@ -3898,6 +3952,12 @@ Item {
     }
     function onActivated(deviceId) {
       statusClearTimer.stop()
+      var dev = root.deviceForId(deviceId)
+      if (dev && root.isSoloistName(dev.sourceName || dev.name)) {
+        root.loadPlaybackState()
+        root.loadDevices()
+        return
+      }
       root.statusMessage = "Speaker connected · waiting for it to become available"
       root.connectActivationAttempts = 0
       root.pendingConnectWakeTried = false
