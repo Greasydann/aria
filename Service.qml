@@ -3502,14 +3502,29 @@ Item {
     return true
   }
 
+  function showMediaOsd(state, text) {
+    var icon = state === "play" ? "media-play" : (state === "pause" ? "media-pause" : "media")
+    var message = String(text || title || "")
+    Quickshell.execDetached(["omarchy-osd", "-i", icon, "-m", message])
+  }
+
   function togglePlayback() {
     noteActivity()
-    if (sendSonosControl(playing ? "pause" : "play", "")) return
-    if (!hasMedia && resumeLastPlayed()) return
-    if (!useRemotePlayback && hasLocalPlayer && activePlayer.canTogglePlaying) {
-      activePlayer.togglePlaying()
+    if (sendSonosControl(playing ? "pause" : "play", "")) {
+      showMediaOsd(playing ? "pause" : "play")
       return
     }
+    if (!hasMedia && resumeLastPlayed()) {
+      showMediaOsd("play")
+      return
+    }
+    var nextState = playing ? "pause" : "play"
+    if (!useRemotePlayback && hasLocalPlayer && activePlayer.canTogglePlaying) {
+      activePlayer.togglePlaying()
+      showMediaOsd(nextState)
+      return
+    }
+    showMediaOsd(nextState)
     remotePlayerAction("PUT", playing ? "/me/player/pause" : "/me/player/play",
       controlQuery())
   }
