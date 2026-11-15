@@ -3549,10 +3549,16 @@ Item {
       controlQuery())
   }
 
+  function soloistCtl(args) {
+    var cmd = ["/home/dann/.local/bin/soloist", "ctl"].concat(args || [])
+    Quickshell.execDetached(cmd)
+  }
+
   function next() {
     noteActivity()
     if (sendSonosControl("next", "")) { showMediaOsd("next"); return }
     showMediaOsd("next")
+    if (soloistDevice()) { soloistCtl(["next"]); return }
     if (!useRemotePlayback && hasLocalPlayer && activePlayer.canGoNext) activePlayer.next()
     else remotePlayerAction("POST", "/me/player/next", controlQuery())
   }
@@ -3561,6 +3567,7 @@ Item {
     noteActivity()
     if (sendSonosControl("previous", "")) { showMediaOsd("previous"); return }
     showMediaOsd("previous")
+    if (soloistDevice()) { soloistCtl(["prev"]); return }
     if (!useRemotePlayback && hasLocalPlayer && activePlayer.canGoPrevious) activePlayer.previous()
     else remotePlayerAction("POST", "/me/player/previous", controlQuery())
   }
