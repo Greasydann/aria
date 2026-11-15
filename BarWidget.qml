@@ -14,7 +14,7 @@ BarWidget {
   moduleName: "spoty"
 
   readonly property var spotify: bar && bar.shell
-    ? bar.shell.serviceFor("quickshell.spotify") : null
+    ? bar.shell.serviceFor("spoty") : null
   readonly property color foreground: bar ? bar.foreground : Theme.Color.foreground
   readonly property color muted: Theme.Color.muted
   readonly property string surfaceKey: "spoty-popup-" + String(root)
@@ -271,14 +271,14 @@ BarWidget {
       // Remap an existing full player onto the workspace containing this bar.
       // Splitting hide and summon across event-loop turns lets Wayland finish
       // unmapping the old surface before the shell opens it here.
-      bar.shell.hide("quickshell.spotify")
+      bar.shell.hide("spoty")
       Qt.callLater(function() {
         if (root.bar && root.bar.shell)
-          root.bar.shell.summon("quickshell.spotify", encoded)
+          root.bar.shell.summon("spoty", encoded)
       })
     } else if (payload && typeof bar.shell.summon === "function")
-      bar.shell.summon("quickshell.spotify", encoded)
-    else bar.shell.toggle("quickshell.spotify", encoded)
+      bar.shell.summon("spoty", encoded)
+    else bar.shell.toggle("spoty", encoded)
   }
 
   function openCurrentArtist() {

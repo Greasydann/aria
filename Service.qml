@@ -711,15 +711,31 @@ Item {
       || identity.indexOf("librespot") !== -1
   }
 
+  // Official Spotify desktop client (local playback target for Spoty hybrid mode).
+  function isOfficialSpotifyPlayer(player) {
+    if (!player) return false
+    var identity = [player.dbusName, player.desktopEntry, player.identity]
+      .join(" ").toLowerCase()
+    return identity.indexOf("spotify") !== -1 && !isSpotifyd(player)
+  }
+
+  function isLocalSpotifyPlayer(player) {
+    return isSpotifyd(player) || isOfficialSpotifyPlayer(player)
+  }
+
   function spotifydPlayer() {
     var fallback = null
+    var officialFallback = null
     for (var i = 0; i < mprisPlayers.length; i++) {
       var player = mprisPlayers[i]
-      if (!isSpotifyd(player)) continue
-      if (player.isPlaying) return player
-      if (!fallback) fallback = player
+      if (!isLocalSpotifyPlayer(player)) continue
+      // Prefer a playing player; among equals prefer the official desktop client.
+      if (player.isPlaying && isOfficialSpotifyPlayer(player)) return player
+      if (player.isPlaying && !fallback) fallback = player
+      if (isOfficialSpotifyPlayer(player) && !officialFallback) officialFallback = player
+      else if (!fallback) fallback = player
     }
-    return fallback
+    return fallback || officialFallback
   }
 
   function metadataString(key) {
@@ -2832,7 +2848,7 @@ Item {
       ? surface[method]() : "unavailable"
   }
   IpcHandler {
-    target: "quickshell.spotify.player"
+    target: "spoty.player"
     function configuredPlayer(): string { return root.shortcutPlayer }
     function togglePlayer(): string { return root.invokePlayerShortcut("toggleConfiguredPlayerShortcut") }
     function toggleMiniPlayer(): string { return root.invokePlayerShortcut("toggleMiniPlayerShortcut") }
