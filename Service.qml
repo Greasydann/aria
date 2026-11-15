@@ -1400,6 +1400,8 @@ Item {
         loadDevices()
       }
     }
+    // Prefer Soloist state for Spoty UI when available.
+    root.applySoloistFallback()
   }
 
   function loadPlaybackState(callback, reportError) {
