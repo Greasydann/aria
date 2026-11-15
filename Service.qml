@@ -3276,23 +3276,14 @@ Item {
           target, root.selectedDeviceExplicit))
         return
       }
-      var local = root.localDevice()
-      if (local && local.id && !local.restricted) {
-        root.selectedDeviceId = local.id
-        root.selectedDeviceExplicit = false
-        if (root.pendingPlayback) {
-          root.localActivationRequested = false
-          root.sendPendingPlayback(Api.playbackTargetDeviceId(local, false))
-        } else {
-          root.activateLocalDevice(local.id)
-        }
-        return
-      }
+      // Hybrid: never fall back to the embedded omarchy-spotify backend device for audio.
       root.deviceProbeAttempts++
-      if (root.deviceProbeAttempts < 8) deviceProbeTimer.restart()
-      else {
+      if (root.deviceProbeAttempts < 20) {
+        if (root.pendingPlayback) root.ensureOfficialSpotifyRunningHidden()
+        deviceProbeTimer.restart()
+      } else {
         root.clearPendingPlayback()
-        root.fail("Playback on this computer did not become available. Open Spotify (spotify-launcher), sign in, then try again.")
+        root.fail("Open the official Spotify app or Soloist, sign in, then try again for local playback.")
       }
     })
   }
