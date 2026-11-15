@@ -48,7 +48,7 @@ Item {
     showTrackTitle: "On",
     showArtistName: "Off",
     showPausedTrack: "On",
-    scrollBarText: "Off",
+    scrollBarText: "On",
     scrollSpeed: "1",
     maxBarTextWidth: "240",
     fixedBarWidth: "Off",
