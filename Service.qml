@@ -756,8 +756,17 @@ Item {
     resumeLyricsInstallIntent()
   }
 
+  function isEmbeddedOmarchyBackendPlayer(player) {
+    if (!player) return false
+    var identity = [player.dbusName, player.desktopEntry, player.identity]
+      .join(" ").toLowerCase()
+    return identity.indexOf("omarchyspotify") !== -1
+      || identity.indexOf("omarchy-spotify") !== -1
+  }
+
   function isSpotifyd(player) {
     if (!player) return false
+    if (isEmbeddedOmarchyBackendPlayer(player)) return false
     var identity = [player.dbusName, player.desktopEntry, player.identity]
       .join(" ").toLowerCase()
     return identity.indexOf("spotifyd") !== -1
@@ -767,6 +776,7 @@ Item {
   // Official Spotify desktop client (local playback target for Spoty hybrid mode).
   function isOfficialSpotifyPlayer(player) {
     if (!player) return false
+    if (isEmbeddedOmarchyBackendPlayer(player)) return false
     var identity = [player.dbusName, player.desktopEntry, player.identity]
       .join(" ").toLowerCase()
     return identity.indexOf("spotify") !== -1 && !isSpotifyd(player)
