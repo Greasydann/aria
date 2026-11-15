@@ -1340,24 +1340,14 @@ Item {
 
   function applySoloistFallback() {
     if (!soloistPlayback || !soloistPlayback.item) return false
-    // Use Soloist state when API remote playback is missing or not actively playing this item.
-    var api = remotePlayback
-    if (!api || !api.item) {
-      remotePlayback = soloistPlayback
-      playbackPositionTick++
-      return true
-    }
-    // If API shows different/no useful state, prefer Soloist (our active target).
-    if (api.playing !== true && soloistPlayback.playing === true) {
-      remotePlayback = soloistPlayback
-      playbackPositionTick++
-      return true
-    }
-    return false
+    // Spoty uses Soloist as the playback target: prefer Soloist state for UI.
+    remotePlayback = soloistPlayback
+    playbackPositionTick++
+    return true
   }
 
   function refreshSoloistPlayback() {
-    soloistNowProcess.running = false
+    if (soloistNowProcess.running) return
     soloistNowProcess.running = true
   }
 
@@ -4561,16 +4551,19 @@ Item {
   Process {
     id: soloistNowProcess
     command: ["/home/dann/.local/bin/soloist", "ctl", "now", "--json"]
-    stdout: StdioCollector { waitForEnd: true }
+    stdout: StdioCollector { id: soloistNowStdout; waitForEnd: true }
     stderr: StdioCollector { waitForEnd: true }
     onExited: function(exitCode) {
-      if (exitCode !== 0) return
-      var state = root.normalizeSoloistPlayback(stdout.text)
-      if (state) {
-        root.soloistPlayback = state
-        root.soloistPlaybackAt = Date.now()
-        root.applySoloistFallback()
+      if (exitCode === 0) {
+        var state = root.normalizeSoloistPlayback(soloistNowStdout.text)
+        if (state) {
+          root.soloistPlayback = state
+          root.soloistPlaybackAt = Date.now()
+          root.applySoloistFallback()
+        }
       }
+      // Allow next poll to start
+      soloistNowProcess.running = false
     }
   }
 
