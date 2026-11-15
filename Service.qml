@@ -3093,14 +3093,20 @@ Item {
     var officialMpris = officialSpotifyMprisPlayer()
     var target = autoselectLocalDevice() || chooseDevice()
 
-    // Spoty hybrid: prefer the official Spotify desktop client for local playback.
+    // Spoty: prefer Soloist (lightweight background playback) when available.
+    if (soloist && soloist.id) {
+      localActivationRequested = false
+      sendPendingPlayback(soloist.id)
+      return
+    }
+
+    // Fallback: official Spotify desktop client for local playback.
     if (official && official.id) {
       localActivationRequested = false
       sendPendingPlayback(official.id)
       return
     }
     if (officialMpris) {
-      // Official app is running but not yet visible as a Connect device; refresh and retry.
       loadDevices()
       if (!officialSpotifyLaunchWaitAttempts) officialSpotifyLaunchWaitAttempts = 0
       if (officialSpotifyLaunchWaitAttempts < 10) {
@@ -3111,13 +3117,6 @@ Item {
         fail("Spotify is running, but not yet available as a playback device. Try again in a moment.")
         clearPendingPlayback()
       }
-      return
-    }
-
-    // Prefer Soloist (external Connect device service) for local playback.
-    if (soloist && soloist.id && (!target || target.local || isSoloistName(target.sourceName || target.name))) {
-      localActivationRequested = false
-      sendPendingPlayback(soloist.id)
       return
     }
     if (target && !target.local) {
