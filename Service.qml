@@ -1009,9 +1009,13 @@ Item {
 
   function ensureVisibleLocalReceiver() {
     if (localPlaybackStopped || daemonManager.terminalFailure) return
-    // Soloist is an external Connect device service; don't auto-start the
-    // built-in local backend for it.
     if (soloistDevice()) {
+      cancelVisibleLocalDeviceRefresh()
+      return
+    }
+    // Spoty hybrid: prefer official Spotify client for local playback; don't
+    // auto-start the broken embedded backend when the official app is available.
+    if (officialSpotifyMprisPlayer() || officialSpotifyConnectDevice()) {
       cancelVisibleLocalDeviceRefresh()
       return
     }
@@ -3236,6 +3240,26 @@ Item {
     if (!pendingPlayback && !localActivationRequested) return
     loadDevices(function() {
       if (!root.pendingPlayback && !root.localActivationRequested) return
+      var official = root.officialSpotifyConnectDevice()
+      if (official && official.id) {
+        root.officialSpotifyLaunchWaitAttempts = 0
+        root.localActivationRequested = false
+        root.deviceProbeAttempts = 0
+        if (root.pendingPlayback)
+          root.sendPendingPlayback(official.id)
+        else
+          root.activateLocalDevice(official.id)
+        return
+      }
+      if (root.officialSpotifyMprisPlayer()) {
+        root.deviceProbeAttempts++
+        if (root.deviceProbeAttempts < 20) deviceProbeTimer.restart()
+        else {
+          root.clearPendingPlayback()
+          root.fail("Spotify is running, but did not become available as a playback device. Make sure you're signed in, then try again.")
+        }
+        return
+      }
       var soloist = root.soloistDevice()
       if (soloist && soloist.id) {
         root.localActivationRequested = false
@@ -3268,9 +3292,7 @@ Item {
       if (root.deviceProbeAttempts < 8) deviceProbeTimer.restart()
       else {
         root.clearPendingPlayback()
-        root.fail(soloist
-          ? "SoloistPC was not available to Spotify. Make sure Soloist is running and logged in, then try again."
-          : "Playback on this computer did not become available. Reconnect Spotify in Settings, then try again")
+        root.fail("Playback on this computer did not become available. Open Spotify (spotify-launcher), sign in, then try again.")
       }
     })
   }
