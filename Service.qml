@@ -1023,56 +1023,16 @@ Item {
   property bool localPlaybackStopped: false
 
   function ensureVisibleLocalReceiver() {
-    if (localPlaybackStopped || daemonManager.terminalFailure) return
-    if (soloistDevice()) {
-      cancelVisibleLocalDeviceRefresh()
-      return
-    }
-    // Spoty hybrid: prefer official Spotify client for local playback; don't
-    // auto-start the broken embedded backend when the official app is available.
-    if (officialSpotifyMprisPlayer() || officialSpotifyConnectDevice()) {
-      cancelVisibleLocalDeviceRefresh()
-      return
-    }
-    var action = Api.visibleLocalReceiverAction(uiVisible,
-      fullyConnected && daemonManager.credentialsAvailable,
-      daemonManager.running, daemonManager.busy)
-    if (action === "idle") {
-      cancelVisibleLocalDeviceRefresh()
-      return
-    }
-    if (action === "start") daemonManager.start()
-    if (action === "refresh") visibleLocalDeviceRefreshAttempts = 0
-    visibleLocalDeviceRefreshTimer.restart()
+    // Spoty uses Soloist/official client for local playback; never start the
+    // embedded omarchy-spotify backend (which advertises "Omarchy Spotify").
+    cancelVisibleLocalDeviceRefresh()
+    return
   }
 
   function refreshVisibleLocalDevice() {
-    if (localPlaybackStopped || daemonManager.terminalFailure) return
-    if (soloistDevice()) {
-      cancelVisibleLocalDeviceRefresh()
-      return
-    }
-    var action = Api.visibleLocalReceiverAction(uiVisible,
-      fullyConnected && daemonManager.credentialsAvailable,
-      daemonManager.running, daemonManager.busy)
-    if (action === "idle") {
-      cancelVisibleLocalDeviceRefresh()
-      return
-    }
-    if (action !== "refresh") {
-      if (action === "start") daemonManager.start()
-      visibleLocalDeviceRefreshTimer.restart()
-      return
-    }
-    loadDevices(function() {
-      if (!root.uiVisible || !root.fullyConnected || root.localDevice()) {
-        root.visibleLocalDeviceRefreshAttempts = 0
-        return
-      }
-      root.visibleLocalDeviceRefreshAttempts++
-      if (root.visibleLocalDeviceRefreshAttempts < 8)
-        visibleLocalDeviceRefreshTimer.restart()
-    })
+    // Spoty: no embedded omarchy-spotify receiver.
+    cancelVisibleLocalDeviceRefresh()
+    return
   }
 
   function setUiVisible(key, value) {
@@ -3175,7 +3135,7 @@ Item {
       clearPendingPlayback()
       return
     }
-    daemonManager.start()
+    // daemonManager.start() disabled for Spoty (Soloist-only)
     deviceProbeTimer.restart()
   }
 
@@ -3190,7 +3150,7 @@ Item {
       clearPendingPlayback()
       return
     }
-    if (!daemonManager.running && !daemonManager.busy) daemonManager.start()
+    // daemon start disabled for Spoty
     localSocketWaitAttempts = 0
     localSocketWaitTimer.restart()
   }
@@ -3757,7 +3717,7 @@ Item {
       deviceProbeTimer.restart()
       return
     }
-    daemonManager.start(true)
+    // daemonManager.start(true) disabled for Spoty (Soloist-only)
     deviceProbeTimer.restart()
   }
 
