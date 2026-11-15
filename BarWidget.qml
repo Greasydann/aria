@@ -566,11 +566,11 @@ BarWidget {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: root.iconOnly ? "" : ""
+    text: ""
     hasVisualContent: true
     slotSize: Style.bar.iconSlot
     opticalSize: Style.bar.iconCanvas
-    fontSize: root.iconOnly ? Math.round(Style.bar.iconFont * 0.9) : Style.font.body
+    fontSize: Style.font.body
     active: root.spotify && root.spotify.playing
     // Follow the bar's contrast-aware color when transparency changes.
     // Keep root.foreground theme-based for the popup/player surfaces.
@@ -580,9 +580,10 @@ BarWidget {
       ? root.spotify.title + (root.spotify.artist ? " — " + root.spotify.artist : "")
       : (root.spotify && !root.spotify.accountConnected
         ? "Set up Omarchy Spotify" : "Omarchy Spotify")
-    // Size from the painted glyph and label plus the real inner chrome.
+    readonly property real contentLeftMargin: scaledHorizontalMargin
     readonly property real fittedWidth: Math.ceil(barGlyph.width
-      + barContent.spacing + barLabel.implicitWidth + scaledHorizontalMargin * 2)
+      + (scrollClip.visible ? (barContent.spacing + barLabel.implicitWidth) : 0)
+      + scaledHorizontalMargin * 2)
     readonly property real barTextCap: root.spotify ? root.spotify.maxBarTextWidth : 240
 
     fixedWidth: root.vertical ? root.barSize
@@ -595,9 +596,10 @@ BarWidget {
 
     Row {
       id: barContent
-      anchors.centerIn: parent
+      anchors.left: parent.left
+      anchors.leftMargin: button.contentLeftMargin
+      anchors.verticalCenter: parent.verticalCenter
       spacing: Style.space(6)
-      visible: !root.iconOnly
       enabled: false
 
       OpticalGlyph {
@@ -608,11 +610,12 @@ BarWidget {
         text: ""
         color: button.foreground
         fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-        fontSize: Style.font.body
+        fontSize: root.iconOnly ? Math.round(Style.bar.iconFont * 0.9) : Style.font.body
       }
 
       Item {
         id: scrollClip
+        visible: !root.iconOnly
         width: Math.max(0, button.width - barGlyph.width
           - barContent.spacing - button.scaledHorizontalMargin * 2)
         height: barGlyph.height
@@ -715,7 +718,7 @@ BarWidget {
 
   KeyboardPanel {
     id: popup
-    anchorItem: button
+    anchorItem: barGlyph
     bar: root.bar
     owner: root
     open: root.popupOpen
