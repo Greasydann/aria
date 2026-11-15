@@ -3534,14 +3534,16 @@ Item {
 
   function next() {
     noteActivity()
-    if (sendSonosControl("next", "")) return
+    if (sendSonosControl("next", "")) { showMediaOsd("next"); return }
+    showMediaOsd("next")
     if (!useRemotePlayback && hasLocalPlayer && activePlayer.canGoNext) activePlayer.next()
     else remotePlayerAction("POST", "/me/player/next", controlQuery())
   }
 
   function previous() {
     noteActivity()
-    if (sendSonosControl("previous", "")) return
+    if (sendSonosControl("previous", "")) { showMediaOsd("previous"); return }
+    showMediaOsd("previous")
     if (!useRemotePlayback && hasLocalPlayer && activePlayer.canGoPrevious) activePlayer.previous()
     else remotePlayerAction("POST", "/me/player/previous", controlQuery())
   }

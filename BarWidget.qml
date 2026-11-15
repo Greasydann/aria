@@ -619,8 +619,9 @@ BarWidget {
         anchors.verticalCenter: parent.verticalCenter
         clip: barLabel.needsScroll
 
-        readonly property bool scrolling: root.spotify && root.spotify.scrollBarText
-          && barLabel.needsScroll && !root.popupOpen && !root.vertical
+        readonly property bool scrolling: root.spotify && barLabel.needsScroll
+          && root.spotify.hasMedia && root.spotify.playing
+          && !root.popupOpen && !root.vertical
         // Use a wide enough ramp to read as a deliberate fade at bar scale.
         readonly property real fadeStop: width > 0
           ? Math.min(0.2, Style.space(28) / width) : 0
