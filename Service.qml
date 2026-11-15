@@ -2881,9 +2881,25 @@ Item {
     function togglePlayer(): string { return root.invokePlayerShortcut("toggleConfiguredPlayerShortcut") }
     function toggleMiniPlayer(): string { return root.invokePlayerShortcut("toggleMiniPlayerShortcut") }
     function toggleFullPlayer(): string { return root.invokePlayerShortcut("toggleFullPlayerShortcut") }
-    function playPause(): string { root.togglePlayback(); return "ok" }
-    function next(): string { root.next(); return "ok" }
-    function previous(): string { root.previous(); return "ok" }
+    function playPause(): string {
+      if (root.soloistDevice() || root.officialSpotifyMprisPlayer() === null) {
+        var bin = "/home/dann/.local/bin/soloist"
+        Quickshell.execDetached(["sh", "-c",
+          bin + " ctl now 2>&1 | grep -q '\\bplaying\\b' && " + bin + " ctl pause || " + bin + " ctl play"])
+      }
+      root.togglePlayback()
+      return "ok"
+    }
+    function next(): string {
+      Quickshell.execDetached(["/home/dann/.local/bin/soloist", "ctl", "next"])
+      root.next()
+      return "ok"
+    }
+    function previous(): string {
+      Quickshell.execDetached(["/home/dann/.local/bin/soloist", "ctl", "prev"])
+      root.previous()
+      return "ok"
+    }
     function volumeUp(): string {
       var surface = root.shortcutSurface()
       return surface && surface.adjustVolume(0.05) ? "ok" : "unavailable"
