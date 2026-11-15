@@ -1315,9 +1315,9 @@ Item {
     if (!track.uri) return null
     return {
       device: {
-        id: "",
+        id: "soloist:spoty",
         name: root.soloistDeviceName || "Spoty",
-        sourceName: root.soloistDeviceName || "Spoty",
+        sourceName: "Soloist",
         type: "Computer",
         active: true,
         restricted: false,
