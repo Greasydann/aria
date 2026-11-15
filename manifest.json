@@ -29,7 +29,7 @@
     "allowMultiple": false,
     "defaultSection": "left",
     "defaults": {
-      "deviceName": "Omarchy Spotify",
+      "deviceName": "Spoty",
       "idleShutdownMinutes": 15,
       "showMiniPlayer": "On",
       "showVinylRecord": "Off",

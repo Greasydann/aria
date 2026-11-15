@@ -37,7 +37,7 @@ Item {
   readonly property string sessionPath: stateDir + "/session.json"
 
   readonly property var defaultSettingValues: ({
-    deviceName: "Omarchy Spotify",
+    deviceName: "Spoty",
     idleShutdownMinutes: 15,
     showMiniPlayer: "On",
     showVinylRecord: "Off",
@@ -58,7 +58,7 @@ Item {
   property var settings: Api.shallowCopy(defaultSettingValues)
   property bool settingsReady: false
 
-  readonly property string deviceName: String(settings.deviceName || "Omarchy Spotify").trim() || "Omarchy Spotify"
+  readonly property string deviceName: String(settings.deviceName || "Spoty").trim() || "Spoty"
   readonly property string soloistDeviceName: "Spoty"
   readonly property var soloistDeviceNames: ["Spoty", "Spotty", "SoloistPC", "OmaSpotify (this PC)"]
 
@@ -387,7 +387,7 @@ Item {
   property string selectedDeviceId: ""
   property bool selectedDeviceExplicit: false
   property string localDeviceId: ""
-  property string localRuntimeDeviceName: "Omarchy Spotify"
+  property string localRuntimeDeviceName: "Spoty"
   property alias searchQuery: searchController.searchQuery
   property alias searchGroups: searchController.searchGroups
   property alias searchError: searchController.searchError
@@ -578,7 +578,7 @@ Item {
       var key = keys[i]
       if (source[key] !== undefined) next[key] = source[key]
     }
-    next.deviceName = String(next.deviceName || "Omarchy Spotify").trim() || "Omarchy Spotify"
+    next.deviceName = String(next.deviceName || "Spoty").trim() || "Spoty"
     next.idleShutdownMinutes = Math.max(0, Math.min(1440,
       Math.floor(Number(next.idleShutdownMinutes) || 0)))
     next.showMiniPlayer = String(next.showMiniPlayer || "On") === "Off" ? "Off" : "On"

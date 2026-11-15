@@ -218,7 +218,7 @@ Item {
   function saveSettings(showStatus) {
     if (!service) return
     var values = {
-      deviceName: String(draftDeviceName || "").trim() || "Omarchy Spotify",
+      deviceName: String(draftDeviceName || "").trim() || "Spoty",
       idleShutdownMinutes: Math.max(0, Math.min(1440,
         Math.floor(Number(draftIdleMinutes) || 0))),
       showMiniPlayer: draftShowMiniPlayer ? "On" : "Off",
