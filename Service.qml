@@ -180,6 +180,8 @@ Item {
   property var remotePlayback: null
   property bool remotePlaybackLoading: false
   property var remotePlaybackWaiters: []
+  property var soloistPlayback: null
+  property double soloistPlaybackAt: 0
   property var rememberedRemoteVolumeDevice: null
   property real rememberedRemoteVolumePercent: -1
   property double rememberedRemoteVolumeAt: 0
@@ -1240,6 +1242,123 @@ Item {
         && !Api.pendingRemoteVolumeShouldHold(state ? state.device : null,
           pendingRemoteVolume, now))
       clearPendingRemoteVolume(Number(pendingRemoteVolume.serial) || 0)
+  }
+
+  function normalizeSoloistPlayback(jsonText) {
+    var payload = Api.parseJson(String(jsonText || ""), null)
+    if (!payload || typeof payload !== "object") return null
+    var item = payload.item || {}
+    var dec = item.decorations || {}
+    var identity = dec.identity || {}
+    var visual = dec.visual_identity || {}
+    var covers = Array.isArray(visual.cover) ? visual.cover : []
+    var imageUrl = ""
+    for (var i = 0; i < covers.length; i++) {
+      var c = covers[i] || {}
+      if (String(c.size || "") === "large" || String(c.size || "") === "xlarge" || String(c.size || "") === "default") {
+        if (c.url) imageUrl = String(c.url)
+      }
+    }
+    if (!imageUrl && covers.length && covers[covers.length - 1].url)
+      imageUrl = String(covers[covers.length - 1].url)
+    if (!imageUrl && covers.length && covers[0].url)
+      imageUrl = String(covers[0].url)
+
+    var creators = Array.isArray(dec.creators) ? dec.creators : []
+    var artists = []
+    var subtitleParts = []
+    for (var j = 0; j < creators.length; j++) {
+      var cr = creators[j] || {}
+      var ent = cr.entity || {}
+      var entDec = ent.decorations || {}
+      var name = String(((entDec.identity || {}).name) || "")
+      if (name) {
+        subtitleParts.push(name)
+        artists.push({ id: String(ent.uri || "").replace("spotify:artist:", ""), uri: String(ent.uri || ""), type: "artist", name: name, imageUrl: "" })
+      }
+    }
+    var parent = (dec.parent && dec.parent.entity) ? dec.parent.entity : null
+    var parentDec = parent ? (parent.decorations || {}) : {}
+    var albumName = String(((parentDec.identity || {}).name) || "")
+    var playback = dec.playback || {}
+    var durationMs = Math.max(0, Number(playback.duration_ms) || 0)
+    var pos = payload.position || {}
+    var progressMs = Math.max(0, Number(pos.position_ms) || 0)
+    var status = String(payload.status || "")
+    var isPlaying = status === "playing"
+    var repeat = String((payload.options && payload.options.repeat) || "off")
+    if (["off", "track", "context"].indexOf(repeat) < 0) repeat = "off"
+
+    var track = {
+      kind: "item",
+      type: String(item.entity_type || "track"),
+      id: String(item.uri || "").replace("spotify:track:", ""),
+      uri: String(item.uri || ""),
+      name: String(identity.name || "Unknown track"),
+      subtitle: subtitleParts.join(", "),
+      album: albumName,
+      artists: artists,
+      albumItem: null,
+      parentContext: null,
+      imageUrl: imageUrl,
+      durationMs: durationMs,
+      trackNumber: 0,
+      discNumber: 0,
+      releaseDate: "",
+      addedAt: "",
+      playedAt: "",
+      resumeMs: 0,
+      fullyPlayed: false,
+      explicit: false,
+      externalUrl: ""
+    }
+    if (!track.uri) return null
+    return {
+      device: {
+        id: "",
+        name: root.soloistDeviceName || "Spoty",
+        sourceName: root.soloistDeviceName || "Spoty",
+        type: "Computer",
+        active: true,
+        restricted: false,
+        volumePercent: Math.max(0, Math.min(100, Number(payload.volume) || 0)),
+        supportsVolume: true,
+        local: false
+      },
+      item: track,
+      playing: isPlaying,
+      progressSeconds: progressMs / 1000,
+      receivedAt: Date.now(),
+      repeatMode: repeat,
+      shuffle: !!(payload.options && payload.options.shuffle),
+      contextUri: String((payload.context && payload.context.uri) || ""),
+      contextHref: "",
+      contextType: String((payload.context && payload.context.entity_type) || ""),
+      disallows: ({})
+    }
+  }
+
+  function applySoloistFallback() {
+    if (!soloistPlayback || !soloistPlayback.item) return false
+    // Use Soloist state when API remote playback is missing or not actively playing this item.
+    var api = remotePlayback
+    if (!api || !api.item) {
+      remotePlayback = soloistPlayback
+      playbackPositionTick++
+      return true
+    }
+    // If API shows different/no useful state, prefer Soloist (our active target).
+    if (api.playing !== true && soloistPlayback.playing === true) {
+      remotePlayback = soloistPlayback
+      playbackPositionTick++
+      return true
+    }
+    return false
+  }
+
+  function refreshSoloistPlayback() {
+    soloistNowProcess.running = false
+    soloistNowProcess.running = true
   }
 
   function applyPlaybackState(payload) {
@@ -3563,7 +3682,7 @@ Item {
     noteActivity()
     if (sendSonosControl("next", "")) { showMediaOsd("next"); return }
     showMediaOsd("next")
-    if (soloistDevice()) { soloistCtl(["next"]); return }
+    if (soloistDevice() || !hasLocalPlayer) { soloistCtl(["next"]); if (soloistDevice()) return }
     if (!useRemotePlayback && hasLocalPlayer && activePlayer.canGoNext) activePlayer.next()
     else remotePlayerAction("POST", "/me/player/next", controlQuery())
   }
@@ -3572,7 +3691,7 @@ Item {
     noteActivity()
     if (sendSonosControl("previous", "")) { showMediaOsd("previous"); return }
     showMediaOsd("previous")
-    if (soloistDevice()) { soloistCtl(["prev"]); return }
+    if (soloistDevice() || !hasLocalPlayer) { soloistCtl(["prev"]); if (soloistDevice()) return }
     if (!useRemotePlayback && hasLocalPlayer && activePlayer.canGoPrevious) activePlayer.previous()
     else remotePlayerAction("POST", "/me/player/previous", controlQuery())
   }
@@ -4437,5 +4556,30 @@ Item {
     wanted: daemonManager.running && !daemonManager.usingFallbackRuntime
     onErrorCodeChanged: if (errorCode === "audio_key_unavailable")
       root.fail(errorMessage || "Spotify could not play this track on this computer")
+  }
+
+  Process {
+    id: soloistNowProcess
+    command: ["/home/dann/.local/bin/soloist", "ctl", "now", "--json"]
+    stdout: StdioCollector { waitForEnd: true }
+    stderr: StdioCollector { waitForEnd: true }
+    onExited: function(exitCode) {
+      if (exitCode !== 0) return
+      var state = root.normalizeSoloistPlayback(stdout.text)
+      if (state) {
+        root.soloistPlayback = state
+        root.soloistPlaybackAt = Date.now()
+        root.applySoloistFallback()
+      }
+    }
+  }
+
+  Timer {
+    id: soloistPollTimer
+    interval: 3000
+    repeat: true
+    running: true
+    triggeredOnStart: true
+    onTriggered: root.refreshSoloistPlayback()
   }
 }
