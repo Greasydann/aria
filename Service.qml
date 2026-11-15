@@ -21,7 +21,7 @@ Item {
   property var pluginRegistry: null
 
   readonly property string pluginId: manifest && manifest.id
-    ? String(manifest.id) : "quickshell.spotify"
+    ? String(manifest.id) : "spoty"
   readonly property string pluginDir: {
     var url = String(Qt.resolvedUrl("./"))
     return url.indexOf("file://") === 0

@@ -11,13 +11,13 @@ import "Api.js" as Api
 BarWidget {
   id: root
 
-  moduleName: "quickshell.spotify"
+  moduleName: "spoty"
 
   readonly property var spotify: bar && bar.shell
     ? bar.shell.serviceFor("quickshell.spotify") : null
   readonly property color foreground: bar ? bar.foreground : Theme.Color.foreground
   readonly property color muted: Theme.Color.muted
-  readonly property string surfaceKey: "spotify-popup-" + String(root)
+  readonly property string surfaceKey: "spoty-popup-" + String(root)
   readonly property string lyricsRequestKey: surfaceKey + "-lyrics"
   readonly property string barText: spotify
     ? Api.barTrackText(spotify.title, spotify.artist,

@@ -96,7 +96,7 @@ Item {
   property string createPlaylistName: ""
 
   readonly property string pluginId: manifest && manifest.id
-    ? String(manifest.id) : "quickshell.spotify"
+    ? String(manifest.id) : "spoty"
   readonly property string lyricsRequestKey: "spotify-panel-lyrics"
   readonly property color foreground: Theme.Color.foreground
   readonly property color background: Theme.Color.background
