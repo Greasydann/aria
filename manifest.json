@@ -5,7 +5,7 @@
   "version": "1.1.0",
   "author": "QuickshellSpotify",
   "license": "MIT",
-  "description": "Spotify in Quickshell (Spoty fork) \u2014 browse with the familiar UI and play locally via the official Spotify desktop client.",
+  "description": "Spoty: quickshell.spotify-style Spotify UI for Omarchy, with local playback via Soloist or the official Spotify client (no broken librespot backend).",
   "kinds": [
     "service",
     "bar-widget",
@@ -19,7 +19,7 @@
   },
   "barWidget": {
     "displayName": "Spoty",
-    "description": "Spoty: quickshell.spotify aesthetics with local playback routed to the official Spotify app.",
+    "description": "Spoty bar/panel: browse and control Spotify with local playback routed to Soloist (preferred) or the official Spotify app.",
     "category": "Media",
     "aliases": [
       "spotify",

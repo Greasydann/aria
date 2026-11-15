@@ -59,8 +59,8 @@ Item {
   property bool settingsReady: false
 
   readonly property string deviceName: String(settings.deviceName || "Omarchy Spotify").trim() || "Omarchy Spotify"
-  readonly property string soloistDeviceName: "Spotty"
-  readonly property var soloistDeviceNames: ["Spotty", "SoloistPC", "OmaSpotify (this PC)"]
+  readonly property string soloistDeviceName: "Spoty"
+  readonly property var soloistDeviceNames: ["Spoty", "Spotty", "SoloistPC", "OmaSpotify (this PC)"]
 
   function isSoloistName(name) {
     var n = String(name || "").trim().toLowerCase()
