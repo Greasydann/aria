@@ -59,11 +59,16 @@ Item {
   property bool settingsReady: false
 
   readonly property string deviceName: String(settings.deviceName || "Omarchy Spotify").trim() || "Omarchy Spotify"
-  readonly property string soloistDeviceName: "SoloistPC"
+  readonly property string soloistDeviceName: "Spotty"
+  readonly property var soloistDeviceNames: ["Spotty", "SoloistPC", "OmaSpotify (this PC)"]
 
   function isSoloistName(name) {
-    var n = String(name || "").trim()
-    return n === soloistDeviceName || n === "OmaSpotify (this PC)"
+    var n = String(name || "").trim().toLowerCase()
+    if (!n) return false
+    for (var i = 0; i < soloistDeviceNames.length; i++) {
+      if (n === String(soloistDeviceNames[i]).toLowerCase()) return true
+    }
+    return n.indexOf("soloist") !== -1
   }
 
   function soloistDevice() {
