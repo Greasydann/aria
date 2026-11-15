@@ -3338,6 +3338,14 @@ Item {
       spotifyApi.request("PUT", "/me/player/play", { device_id: deviceId }, body,
         function(status, payload, error) {
           if (!current()) return
+          if (!error) {
+            if (playbackSerial === root.radioSerial)
+              root.radioContextSelected = !!radioPlaylist
+            if (successMessage) root.succeed(successMessage)
+            root.loadPlaybackState()
+            playbackFollowUpTimer.restart()
+            return
+          }
           if (error && !retried && status === 404 && payload && payload.error
               && payload.error.reason === "NO_ACTIVE_DEVICE" && target
               && target.local && !target.restricted && deviceId) {
