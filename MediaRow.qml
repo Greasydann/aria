@@ -281,7 +281,10 @@ BorderSurface {
         id: saveButton
         objectName: "media-row-save"
         visible: root.saveActionVisible
-        iconText: "󰋑"
+        // Outline heart when not saved yet, filled once saved — same
+        // convention as the footer's like button. The row button is only
+        // shown while unsaved, so it paints the outline variant.
+        iconText: root.saved ? "󰋑" : "󰋕"
         foreground: Theme.Color.urgent
         accent: Theme.Color.urgent
         tooltipText: "Save to library"
