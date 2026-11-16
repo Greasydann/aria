@@ -702,14 +702,20 @@ BarWidget {
       }
     }
 
-    // Invisible anchor the bar reads to center the open-panel indicator
-    // over the Spotify glyph, whatever the scrolling text is doing.
+    // Invisible anchor the bar reads to size and place the open-panel
+    // indicator. Bar.qml draws the final mark at mark.width * 0.55, so the
+    // anchor is pre-scaled for the wanted on-screen extent. The mark is
+    // always centered on the Spotify glyph (glyph x is Row-relative, hence
+    // the contentLeftMargin) and never hangs past the widget's left edge.
     Item {
       id: panelIndicatorMark
-      width: Style.bar.iconSlot
-      height: 1
-      x: barGlyph.x + barGlyph.width / 2 - width / 2
-      y: barGlyph.y + barGlyph.height / 2 - height / 2
+      readonly property real glyphCenter: button.contentLeftMargin
+        + barGlyph.x + barGlyph.width / 2
+      width: Math.min(button.width * 0.5 / 0.55, glyphCenter * 2,
+        Style.bar.iconSlot * 1.2)
+      height: button.height
+      x: glyphCenter - width / 2
+      y: 0
       visible: false
     }
 
