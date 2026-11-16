@@ -176,7 +176,7 @@ Item {
     hasCursor: root.cursorOn("popup", contextAction)
     focusable: false
     onHovered: function(on) {
-      if (on && contextAction) root.setPanelCursor("popup", contextAction)
+      root.hoverPanelCursor("popup", contextAction, on)
     }
     KeyHint {
       region: "popup"
@@ -1087,6 +1087,17 @@ Item {
     panelCursorAction = Api.ensureCursorAction(regionCursorActions(region),
       panelCursorAction, fallback)
     syncCollectionCursor()
+  }
+
+  // Mouse hover drives the panel cursor model too, but leaving a control
+  // must hand the highlight back: otherwise the last-hovered control keeps
+  // the cursor fill after the mouse moves away.
+  function hoverPanelCursor(region, action, hovered) {
+    if (hovered) {
+      if (action) setPanelCursor(region, action)
+      return
+    }
+    panelCursorActive = false
   }
 
   function setPanelCursor(region, action) {
@@ -3500,9 +3511,7 @@ Item {
                     if (radioEntry) root.openLastRadio()
                     else root.chooseTab(modelData.id)
                   }
-                  onHovered: function(on) {
-                    if (on) root.setPanelCursor("sidebar", "nav-" + modelData.id)
-                  }
+                  onHovered: function(on) { root.hoverPanelCursor("sidebar", "nav-" + modelData.id, on) }
                   KeyHint {
                     region: "sidebar"
                     action: "nav-" + modelData.id
@@ -3572,9 +3581,7 @@ Item {
                 hasCursor: root.cursorOn("sidebar", "nav-library")
                 tooltipText: "Liked Songs"
                 onClicked: root.chooseTab("library")
-                onHovered: function(on) {
-                  if (on) root.setPanelCursor("sidebar", "nav-library")
-                }
+                onHovered: function(on) { root.hoverPanelCursor("sidebar", "nav-library", on) }
                 KeyHint { region: "sidebar"; action: "nav-library" }
                 OpticalGlyph {
                   anchors.fill: parent
@@ -3610,9 +3617,7 @@ Item {
                   hasCursor: root.cursorOn("sidebar", "nav-playlists")
                   tooltipText: "Playlists"
                   onClicked: root.chooseTab("playlists")
-                  onHovered: function(on) {
-                    if (on) root.setPanelCursor("sidebar", "nav-playlists")
-                  }
+                  onHovered: function(on) { root.hoverPanelCursor("sidebar", "nav-playlists", on) }
                   KeyHint { region: "sidebar"; action: "nav-playlists" }
                   OpticalGlyph {
                     anchors.fill: parent
@@ -3642,9 +3647,7 @@ Item {
                   enabled: root.accountConnected && root.service
                     && !root.service.playlistActionBusy
                   onClicked: root.openCreatePlaylistPopup()
-                  onHovered: function(on) {
-                    if (on) root.setPanelCursor("sidebar", "nav-create")
-                  }
+                  onHovered: function(on) { root.hoverPanelCursor("sidebar", "nav-create", on) }
                   KeyHint { region: "sidebar"; action: "nav-create" }
                 }
               }
@@ -3743,9 +3746,7 @@ Item {
               tooltipText: root.shortcutHint("Settings", "Ctrl+,")
               KeyHint { region: "sidebar"; action: "nav-settings"; sequences: ["Ctrl+,"] }
               onClicked: root.chooseTab("setup")
-              onHovered: function(on) {
-                if (on) root.setPanelCursor("sidebar", "nav-settings")
-              }
+              onHovered: function(on) { root.hoverPanelCursor("sidebar", "nav-settings", on) }
               OpticalGlyph {
                 anchors.fill: parent
                 visible: root.compactWidth
@@ -3824,7 +3825,7 @@ Item {
                 focusable: false
                 hasCursor: root.cursorOn("header", "back")
                 onClicked: root.goBack()
-                onHovered: function(on) { if (on) root.setPanelCursor("header", "back") }
+                onHovered: function(on) { root.hoverPanelCursor("header", "back", on) }
                 KeyHint { region: "header"; action: "back"; sequences: ["Alt+Left"] }
               }
 
@@ -3881,7 +3882,7 @@ Item {
                 focusable: false
                 hasCursor: root.cursorOn("header", "help")
                 onClicked: root.toggleShortcutHelp()
-                onHovered: function(on) { if (on) root.setPanelCursor("header", "help") }
+                onHovered: function(on) { root.hoverPanelCursor("header", "help", on) }
                 KeyHint { region: "header"; action: "help"; sequences: ["Ctrl+/"] }
               }
 
@@ -3894,9 +3895,7 @@ Item {
                 tooltipText: "Refresh"
                 focusable: false
                 hasCursor: root.cursorOn("header", "refresh")
-                onHovered: function(on) {
-                  if (on) root.setPanelCursor("header", "refresh")
-                }
+                onHovered: function(on) { root.hoverPanelCursor("header", "refresh", on) }
                 KeyHint { region: "header"; action: "refresh" }
                 onClicked: {
                   if (!root.service) return
@@ -3926,7 +3925,7 @@ Item {
                 focusable: false
                 hasCursor: root.cursorOn("header", "close")
                 onClicked: root.requestClose()
-                onHovered: function(on) { if (on) root.setPanelCursor("header", "close") }
+                onHovered: function(on) { root.hoverPanelCursor("header", "close", on) }
                 KeyHint { region: "header"; action: "close"; sequences: ["Esc"] }
               }
             }
@@ -4042,9 +4041,7 @@ Item {
                 bordered: true
                 focusable: false
                 hasCursor: root.cursorOn("header", "scope")
-                onHovered: function(on) {
-                  if (on) root.setPanelCursor("header", "scope")
-                }
+                onHovered: function(on) { root.hoverPanelCursor("header", "scope", on) }
                 horizontalPadding: Style.space(8)
                 tooltipText: root.searchInContext
                   ? root.shortcutHint("Search all of Spotify", "Ctrl+F or /")
@@ -4211,9 +4208,7 @@ Item {
                       hasCursor: root.cursorOn("footer", "like")
                       onClicked: if (root.service)
                         root.service.toggleCurrentTrackSaved()
-                      onHovered: function(on) {
-                        if (on) root.setPanelCursor("footer", "like")
-                      }
+                      onHovered: function(on) { root.hoverPanelCursor("footer", "like", on) }
                       KeyHint { region: "footer"; action: "like" }
                     }
 
@@ -4229,9 +4224,7 @@ Item {
                       tooltipText: root.shortcutHint("Song actions", "C")
                       hasCursor: root.cursorOn("footer", "context")
                       onClicked: root.openNowPlayingContext()
-                      onHovered: function(on) {
-                        if (on) root.setPanelCursor("footer", "context")
-                      }
+                      onHovered: function(on) { root.hoverPanelCursor("footer", "context", on) }
                       KeyHint {
                         region: "footer"
                         action: "context"
@@ -4367,9 +4360,7 @@ Item {
                   tooltipText: root.shortcutHint("Shuffle", "Ctrl+S")
                   enabled: root.service && root.service.playbackControllable
                   onClicked: if (root.service) root.service.setShuffle(!root.service.shuffle)
-                  onHovered: function(on) {
-                    if (on) root.setPanelCursor("footer", "shuffle")
-                  }
+                  onHovered: function(on) { root.hoverPanelCursor("footer", "shuffle", on) }
                   KeyHint { region: "footer"; action: "shuffle"; sequences: ["Ctrl+S"] }
                 }
                 TransportButton {
@@ -4379,9 +4370,7 @@ Item {
                   tooltipText: root.shortcutHint("Previous", "Ctrl+Left")
                   enabled: root.service && root.service.playbackControllable
                   onClicked: if (root.service) root.service.previous()
-                  onHovered: function(on) {
-                    if (on) root.setPanelCursor("footer", "previous")
-                  }
+                  onHovered: function(on) { root.hoverPanelCursor("footer", "previous", on) }
                   KeyHint { region: "footer"; action: "previous"; sequences: ["Ctrl+Left"] }
                 }
                 TransportButton {
@@ -4396,9 +4385,7 @@ Item {
                         ? "Resume last played" : "Play"), "Space")
                   enabled: root.service && root.service.playbackStartable
                   onClicked: if (root.service) root.service.togglePlayback()
-                  onHovered: function(on) {
-                    if (on) root.setPanelCursor("footer", "play")
-                  }
+                  onHovered: function(on) { root.hoverPanelCursor("footer", "play", on) }
                   KeyHint { region: "footer"; action: "play"; sequences: ["Space"] }
                 }
                 TransportButton {
@@ -4408,9 +4395,7 @@ Item {
                   tooltipText: root.shortcutHint("Next", "Ctrl+Right")
                   enabled: root.service && root.service.playbackControllable
                   onClicked: if (root.service) root.service.next()
-                  onHovered: function(on) {
-                    if (on) root.setPanelCursor("footer", "next")
-                  }
+                  onHovered: function(on) { root.hoverPanelCursor("footer", "next", on) }
                   KeyHint { region: "footer"; action: "next"; sequences: ["Ctrl+Right"] }
                 }
                 TransportButton {
@@ -4424,9 +4409,7 @@ Item {
                       ? root.service.repeatMode : "off"), "Ctrl+R")
                   enabled: root.service && root.service.playbackControllable
                   onClicked: if (root.service) root.service.cycleRepeat()
-                  onHovered: function(on) {
-                    if (on) root.setPanelCursor("footer", "repeat")
-                  }
+                  onHovered: function(on) { root.hoverPanelCursor("footer", "repeat", on) }
                   KeyHint { region: "footer"; action: "repeat"; sequences: ["Ctrl+R"] }
                 }
                 TransportButton {
@@ -4438,9 +4421,7 @@ Item {
                     "Ctrl+Shift+L")
                   enabled: root.service && root.service.lyricsAvailable
                   onClicked: root.openLyrics()
-                  onHovered: function(on) {
-                    if (on) root.setPanelCursor("footer", "lyrics")
-                  }
+                  onHovered: function(on) { root.hoverPanelCursor("footer", "lyrics", on) }
                   KeyHint { region: "footer"; action: "lyrics"; sequences: ["Ctrl+Shift+L"] }
                 }
               }
@@ -4467,7 +4448,7 @@ Item {
                   hasCursor: root.cursorOn("footer", "seek")
                   foreground: root.foreground
                   HoverHandler {
-                    onHoveredChanged: if (hovered) root.setPanelCursor("footer", "seek")
+                    onHoveredChanged: root.hoverPanelCursor("footer", "seek", hovered)
                   }
 
                 PlaybackSlider {
@@ -4531,9 +4512,7 @@ Item {
                   hasCursor: root.cursorOn("footer", "devices")
                   tooltipText: root.shortcutHint("Devices", "Alt+Shift+D")
                   onClicked: root.chooseTab("devices")
-                  onHovered: function(on) {
-                    if (on) root.setPanelCursor("footer", "devices")
-                  }
+                  onHovered: function(on) { root.hoverPanelCursor("footer", "devices", on) }
                   KeyHint { region: "footer"; action: "devices"; sequences: ["Alt+Shift+D"] }
                 }
 
@@ -4544,9 +4523,7 @@ Item {
                   hasCursor: root.cursorOn("footer", "sleep")
                   tooltipText: root.service ? root.service.sleepStatusText() : "Sleep timer"
                   onClicked: sleepPopup.open()
-                  onHovered: function(on) {
-                    if (on) root.setPanelCursor("footer", "sleep")
-                  }
+                  onHovered: function(on) { root.hoverPanelCursor("footer", "sleep", on) }
                   KeyHint { region: "footer"; action: "sleep" }
                 }
 
@@ -4557,7 +4534,7 @@ Item {
                   hasCursor: root.cursorOn("footer", "volume")
                   foreground: root.foreground
                   HoverHandler {
-                    onHoveredChanged: if (hovered) root.setPanelCursor("footer", "volume")
+                    onHoveredChanged: root.hoverPanelCursor("footer", "volume", hovered)
                   }
 
                 PlaybackSlider {
@@ -4661,9 +4638,7 @@ Item {
               focusable: false
               hasCursor: root.cursorOn("page", "home-" + modelData.type)
               onClicked: root.homeType = modelData.type
-              onHovered: function(on) {
-                if (on) root.setPanelCursor("page", "home-" + modelData.type)
-              }
+              onHovered: function(on) { root.hoverPanelCursor("page", "home-" + modelData.type, on) }
               KeyHint { region: "page"; action: "home-" + modelData.type }
             }
           }
@@ -4961,9 +4936,7 @@ Item {
                       root.service.detailItems, "")
                   else root.activateMedia(root.service.detailItem)
                 }
-                onHovered: function(on) {
-                  if (on) root.setPanelCursor("page", "detail-play")
-                }
+                onHovered: function(on) { root.hoverPanelCursor("page", "detail-play", on) }
                 KeyHint { region: "page"; action: "detail-play" }
               }
               Button {
@@ -4979,9 +4952,7 @@ Item {
                   && !root.service.isSaved(root.service.detailItem)
                 onClicked: if (root.service && !root.service.isSaved(root.service.detailItem))
                   root.service.toggleSaved(root.service.detailItem)
-                onHovered: function(on) {
-                  if (on) root.setPanelCursor("page", "detail-save")
-                }
+                onHovered: function(on) { root.hoverPanelCursor("page", "detail-save", on) }
                 KeyHint { region: "page"; action: "detail-save" }
               }
               Button {
@@ -4992,9 +4963,7 @@ Item {
                 tooltipText: root.shortcutHint("More actions", "C")
                 focusable: false
                 hasCursor: root.cursorOn("page", "detail-more")
-                onHovered: function(on) {
-                  if (on) root.setPanelCursor("page", "detail-more")
-                }
+                onHovered: function(on) { root.hoverPanelCursor("page", "detail-more", on) }
                 KeyHint {
                   region: "page"
                   action: "detail-more"
@@ -5462,9 +5431,7 @@ Item {
               horizontalPadding: Style.space(7)
               hasCursor: root.cursorOn("page", "search-" + modelData.type)
               onClicked: root.selectSearchType(modelData.type)
-              onHovered: function(on) {
-                if (on) root.setPanelCursor("page", "search-" + modelData.type)
-              }
+              onHovered: function(on) { root.hoverPanelCursor("page", "search-" + modelData.type, on) }
               KeyHint { region: "page"; action: "search-" + modelData.type }
             }
           }
@@ -5494,7 +5461,7 @@ Item {
             id: retrySearch
             enabled: root.searchCooldownSeconds === 0
             hasCursor: root.cursorOn("page", "retry-search")
-            onHovered: function(on) { if (on) root.setPanelCursor("page", "retry-search") }
+            onHovered: function(on) { root.hoverPanelCursor("page", "retry-search", on) }
             KeyHint { region: "page"; action: "retry-search" }
             text: "Retry"
             iconText: "󰑐"
@@ -5635,9 +5602,7 @@ Item {
                 root.libraryType = modelData.type
                 if (root.service) root.service.loadLibrary(modelData.type, false)
               }
-              onHovered: function(on) {
-                if (on) root.setPanelCursor("page", "library-" + modelData.type)
-              }
+              onHovered: function(on) { root.hoverPanelCursor("page", "library-" + modelData.type, on) }
               KeyHint { region: "page"; action: "library-" + modelData.type }
             }
           }
@@ -5765,9 +5730,7 @@ Item {
                   playlistItemsCollection.visibleItems.length)
                 : "Play this playlist in its original order"
               onClicked: root.playSelectedPlaylist()
-              onHovered: function(on) {
-                if (on) root.setPanelCursor("page", "playlist-play")
-              }
+              onHovered: function(on) { root.hoverPanelCursor("page", "playlist-play", on) }
               KeyHint { region: "page"; action: "playlist-play" }
             }
 
@@ -5778,9 +5741,7 @@ Item {
               foreground: root.foreground
               tooltipText: root.shortcutHint("More actions", "C")
               hasCursor: root.cursorOn("page", "playlist-more")
-              onHovered: function(on) {
-                if (on) root.setPanelCursor("page", "playlist-more")
-              }
+              onHovered: function(on) { root.hoverPanelCursor("page", "playlist-more", on) }
               KeyHint {
                 region: "page"
                 action: "playlist-more"
