@@ -62,6 +62,21 @@ Item {
   readonly property string soloistDeviceName: "Spoty"
   readonly property var soloistDeviceNames: ["Spoty", "Spotty", "SoloistPC", "OmaSpotify (this PC)"]
 
+  readonly property string hostName: hostnameReader.text.trim()
+  readonly property var officialDesktopNames: ["omarchy", "omarchy spotify", "this computer"]
+
+  // The official Spotify desktop app advertises itself under the machine's
+  // hostname; its hidden background instance must not show up as a device.
+  function isOfficialDesktopDeviceName(name) {
+    var n = String(name || "").trim().toLowerCase()
+    if (!n) return false
+    for (var i = 0; i < officialDesktopNames.length; i++)
+      if (n === String(officialDesktopNames[i]).toLowerCase()) return true
+    var host = String(hostName || "").trim().toLowerCase()
+    if (!host) return false
+    return n === host || n === host + " spotify" || n === host + "spotify"
+  }
+
   function isSoloistName(name) {
     var n = String(name || "").trim().toLowerCase()
     if (!n) return false
@@ -113,18 +128,6 @@ Item {
     return null
   }
 
-  function ensureOfficialSpotifyRunningHidden() {
-    if (officialSpotifyMprisPlayer() || officialSpotifyConnectDevice()) return true
-    Quickshell.execDetached(["sh", "-c",
-      "spotify-launcher >/dev/null 2>&1 & "
-      + "for i in $(seq 1 20); do "
-      + "  hyprctl dispatch movetoworkspacesilent special:spoty,class:^(Spotify|spotify)$ >/dev/null 2>&1; "
-      + "  sleep 0.4; "
-      + "done"])
-    statusClearTimer.stop()
-    statusMessage = "Starting Spotify in background… open it once to sign in if needed"
-    return false
-  }
   readonly property int idleShutdownMinutes: Math.max(0, Math.min(1440,
     Math.floor(Number(settings.idleShutdownMinutes) || 0)))
   readonly property bool showMiniPlayer: String(settings.showMiniPlayer || "On") !== "Off"
@@ -2805,6 +2808,8 @@ Item {
           apiDevice.supportsVolume = current.supportsVolume === true
         }
       }
+      if (!isSoloistName(apiDevice.sourceName || apiDevice.name)
+          && isOfficialDesktopDeviceName(apiDevice.name)) continue
       present[String(apiDevice.id || "")] = true
       next.push(apiDevice)
     }
@@ -2813,6 +2818,7 @@ Item {
       if (present[String(item.id || "")]) continue
       var rawName = String(item.name || "Spotify Connect device")
       var isSoloist = isSoloistName(rawName)
+      if (!isSoloist && isOfficialDesktopDeviceName(rawName)) continue
       var isLocal = !isSoloist && Api.isLocalPlaybackDevice({ id: item.id, name: rawName },
         deviceName, localRuntimeDeviceName, localDeviceId)
       if (isLocal) {
@@ -3204,54 +3210,19 @@ Item {
   function dispatchPendingPlayback(playbackSerial) {
     if (playbackSerial !== pendingPlaybackSerial || !pendingPlaybackBody) return
     var soloist = soloistDevice()
-    var official = officialSpotifyConnectDevice()
-    var officialMpris = officialSpotifyMprisPlayer()
     var target = autoselectLocalDevice() || chooseDevice()
 
-    // Spoty: prefer Soloist (lightweight background playback) when available.
+    // Spoty: Soloist is the single local playback target. The official
+    // Spotify desktop app is never launched or targeted for audio.
     if (soloist && soloist.id) {
       localActivationRequested = false
       sendPendingPlayback(soloist.id)
       return
     }
 
-    // Fallback: official Spotify desktop client for local playback.
-    if (official && official.id) {
-      localActivationRequested = false
-      sendPendingPlayback(official.id)
-      return
-    }
-    if (officialMpris) {
-      loadDevices()
-      if (!officialSpotifyLaunchWaitAttempts) officialSpotifyLaunchWaitAttempts = 0
-      if (officialSpotifyLaunchWaitAttempts < 10) {
-        officialSpotifyLaunchWaitAttempts++
-        deviceProbeTimer.restart()
-      } else {
-        officialSpotifyLaunchWaitAttempts = 0
-        fail("Spotify is running, but not yet available as a playback device. Try again in a moment.")
-        clearPendingPlayback()
-      }
-      return
-    }
     if (target && !target.local) {
       localActivationRequested = false
       sendPendingPlayback(Api.playbackTargetDeviceId(target, selectedDeviceExplicit))
-      return
-    }
-
-    // No official client/device available: launch it hidden and wait for it to appear.
-    if (!official && !officialMpris) {
-      ensureOfficialSpotifyRunningHidden()
-      if (!officialSpotifyLaunchWaitAttempts) officialSpotifyLaunchWaitAttempts = 0
-      if (officialSpotifyLaunchWaitAttempts < 25) {
-        officialSpotifyLaunchWaitAttempts++
-        deviceProbeTimer.restart()
-      } else {
-        officialSpotifyLaunchWaitAttempts = 0
-        fail("Open Spotify (spotify-launcher), sign in, then try again for local playback")
-        clearPendingPlayback()
-      }
       return
     }
 
@@ -3280,8 +3251,8 @@ Item {
       clearPendingPlayback()
       return
     }
-    // daemonManager.start() disabled for Spoty (Soloist-only)
-    deviceProbeTimer.restart()
+    fail("Soloist (Spoty) is not available as a playback device. Make sure it is running and logged in, then try again")
+    clearPendingPlayback()
   }
 
   function waitForLocalSocketThenPlay(playbackSerial) {
@@ -3359,26 +3330,6 @@ Item {
     if (!pendingPlayback && !localActivationRequested) return
     loadDevices(function() {
       if (!root.pendingPlayback && !root.localActivationRequested) return
-      var official = root.officialSpotifyConnectDevice()
-      if (official && official.id) {
-        root.officialSpotifyLaunchWaitAttempts = 0
-        root.localActivationRequested = false
-        root.deviceProbeAttempts = 0
-        if (root.pendingPlayback)
-          root.sendPendingPlayback(official.id)
-        else
-          root.activateLocalDevice(official.id)
-        return
-      }
-      if (root.officialSpotifyMprisPlayer()) {
-        root.deviceProbeAttempts++
-        if (root.deviceProbeAttempts < 20) deviceProbeTimer.restart()
-        else {
-          root.clearPendingPlayback()
-          root.fail("Spotify is running, but did not become available as a playback device. Make sure you're signed in, then try again.")
-        }
-        return
-      }
       var soloist = root.soloistDevice()
       if (soloist && soloist.id) {
         root.localActivationRequested = false
@@ -3395,14 +3346,14 @@ Item {
           target, root.selectedDeviceExplicit))
         return
       }
-      // Hybrid: never fall back to the embedded omarchy-spotify backend device for audio.
+      // Soloist-only: never fall back to the official app or the embedded
+      // omarchy-spotify backend device for audio.
       root.deviceProbeAttempts++
       if (root.deviceProbeAttempts < 20) {
-        if (root.pendingPlayback) root.ensureOfficialSpotifyRunningHidden()
         deviceProbeTimer.restart()
       } else {
         root.clearPendingPlayback()
-        root.fail("Open the official Spotify app or Soloist, sign in, then try again for local playback.")
+        root.fail("Soloist (Spoty) is not available as a playback device. Make sure it is running and logged in, then try again")
       }
     })
   }
@@ -4284,6 +4235,13 @@ Item {
     id: settingsSync
     interval: 0
     onTriggered: root.syncSettings()
+  }
+
+  FileView {
+    id: hostnameReader
+    path: "/etc/hostname"
+    watchChanges: false
+    printErrors: false
   }
 
   Timer {
