@@ -31,8 +31,25 @@ BarWidget {
     || barText === ""
   // The bar centers its open-panel indicator (the small mark under the
   // widget while its panel is open) on this item, so the mark tracks the
-  // Spotify glyph instead of the middle of the whole widget.
-  readonly property alias openPanelIndicatorItem: panelIndicatorMark
+  // Spotify glyph instead of the middle of the whole widget. Bar.qml
+  // measures the mark's position with mapToItem, which does not re-run on
+  // its own when our geometry changes, so two identical marks alternate
+  // whenever the widget moves or resizes. The value change forces the
+  // bar's center binding to re-measure with fresh coordinates.
+  property int panelMarkEpoch: 0
+  property bool panelMarkFlip: false
+  function bumpPanelMark() {
+    panelMarkEpoch++
+    panelMarkFlip = !panelMarkFlip
+  }
+  property Item openPanelIndicatorItem: {
+    panelMarkEpoch
+    return panelMarkFlip ? panelIndicatorMarkAlt : panelIndicatorMark
+  }
+  onXChanged: bumpPanelMark()
+  onYChanged: bumpPanelMark()
+  onWidthChanged: bumpPanelMark()
+  onHeightChanged: bumpPanelMark()
   property bool popupOpen: false
   property bool contextMenuVisible: false
   property bool lyricsInstallPromptVisible: false
@@ -625,6 +642,19 @@ BarWidget {
         // widget's left edge while the icon hugs it.
         Item {
           id: panelIndicatorMark
+          anchors.centerIn: parent
+          readonly property real glyphCenter: button.contentLeftMargin
+            + barGlyph.width / 2
+          width: Math.min(button.width * 0.5 / 0.55, glyphCenter * 2,
+            Style.bar.iconSlot * 1.2)
+          height: button.height
+          visible: false
+        }
+
+        // Identical twin, alternating with the mark above so Bar.qml sees a
+        // value change and re-measures the (unchanged) on-screen position.
+        Item {
+          id: panelIndicatorMarkAlt
           anchors.centerIn: parent
           readonly property real glyphCenter: button.contentLeftMargin
             + barGlyph.width / 2
