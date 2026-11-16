@@ -465,7 +465,9 @@ Item {
     if (!service) return
     var state = service.sessionState || ({})
     service.restoreLastRadioPlaylist(state.lastRadioPlaylist)
-    searchText = String(state.searchText || service.searchQuery || "")
+    // The search query is transient: never restore it. The Search tab
+    // always opens on its recent-searches resting state.
+    searchText = ""
     searchType = ["track", "artist", "album", "playlist", "show", "episode"].indexOf(String(state.searchType || "")) >= 0
       ? String(state.searchType) : "track"
     libraryType = ["tracks", "albums", "artists", "shows", "episodes"]
