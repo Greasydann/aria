@@ -4701,43 +4701,52 @@ Item {
             root.rememberScroll("home:" + root.homeType, y)
           }
         }
+      }
 
-        // Sign-in offer for the reads the native streaming token cannot do
-        // (listening history, top rankings). One-time; the token renews
-        // itself from the stored refresh token afterwards.
-        Column {
-          visible: root.service && !root.service.homeLoading
-            && !root.service.webLoggedIn
-            && root.service.homeItems(root.homeType).length === 0
-          anchors.horizontalCenter: parent.horizontalCenter
-          y: parent.height * 0.42
-          spacing: Style.space(8)
+      // Sign-in offer for the reads the native streaming token cannot do
+      // (listening history, top rankings). One-time; the token renews
+      // itself from the stored refresh token afterwards. Lives outside the
+      // page column: positioner children cannot use anchors.
+      Column {
+        id: homeSignInOffer
+        visible: root.service && !root.service.homeLoading
+          && !root.service.webLoggedIn
+          && root.service.homeItems(root.homeType).length === 0
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: parent.height * 0.42
+        width: Math.min(Style.space(420), parent.width)
+        spacing: Style.space(8)
+
+        Item {
+          width: parent.width
+          height: homeSignInButton.height
+          visible: homeSignInButton.visible
 
           Button {
-            visible: root.service && root.service.homeLoginAvailable
+            id: homeSignInButton
             anchors.horizontalCenter: parent.horizontalCenter
             text: root.service && root.service.webLoginBusy
               ? "Signing in…" : "Log in with Spotify"
             iconText: root.service && root.service.webLoginBusy ? "󰤂" : "󰋑"
             foreground: root.foreground
             enabled: root.service && !root.service.webLoginBusy
+            visible: root.service && root.service.homeLoginAvailable
             onClicked: if (root.service) root.service.loginForHome()
           }
+        }
 
-          Text {
-            width: Math.min(Style.space(420), root.service ? parent.width : 0)
-            anchors.horizontalCenter: parent.horizontalCenter
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.WordWrap
-            visible: root.service
-              && (root.service.webLoginBusy || root.service.homeLoginHint !== "")
-            text: root.service && root.service.webLoginBusy
-              ? root.service.homeLoginHint
-              : (root.service ? root.service.homeLoginHint : "")
-            color: root.muted
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-          }
+        Text {
+          width: parent.width
+          horizontalAlignment: Text.AlignHCenter
+          wrapMode: Text.WordWrap
+          visible: root.service
+            && (root.service.webLoginBusy || root.service.homeLoginHint !== "")
+          text: root.service && root.service.webLoginBusy
+            ? root.service.homeLoginHint
+            : (root.service ? root.service.homeLoginHint : "")
+          color: root.muted
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
         }
       }
     }
