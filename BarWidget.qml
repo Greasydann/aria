@@ -621,7 +621,11 @@ BarWidget {
       ? root.spotify.title + (root.spotify.artist ? " — " + root.spotify.artist : "")
       : (root.spotify && !root.spotify.accountConnected
         ? "Set up Omarchy Spotify" : "Omarchy Spotify")
-    readonly property real contentLeftMargin: scaledHorizontalMargin
+    // The Spotify glyph's horizontal anchor: the exact center of the idle
+    // icon slot (widget width is iconSlot when idle). Held constant in
+    // every state, so the icon sits dead-center in the hover pill when
+    // idle and never shifts when the scrolling text appears or changes.
+    readonly property real glyphInset: (Style.bar.iconSlot - barGlyph.width) / 2
     readonly property real fittedWidth: Math.ceil(barGlyph.width
       + (scrollClip.visible ? (barContent.spacing + barLabel.implicitWidth) : 0)
       + scaledHorizontalMargin * 2)
@@ -638,7 +642,7 @@ BarWidget {
     Row {
       id: barContent
       anchors.left: parent.left
-      anchors.leftMargin: button.contentLeftMargin
+      anchors.leftMargin: button.glyphInset
       anchors.verticalCenter: parent.verticalCenter
       spacing: Style.space(6)
       enabled: false
@@ -663,7 +667,7 @@ BarWidget {
         Item {
           id: panelIndicatorMark
           anchors.centerIn: parent
-          readonly property real glyphCenter: button.contentLeftMargin
+          readonly property real glyphCenter: button.glyphInset
             + barGlyph.width / 2
           // Fixed size: tied to the icon slot only, never to the widget's
           // width, so the mark does not grow and shrink as the title/artist
