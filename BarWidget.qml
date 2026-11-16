@@ -597,7 +597,10 @@ BarWidget {
     Row {
       id: barContent
       anchors.left: parent.left
-      anchors.leftMargin: button.contentLeftMargin
+      // With text: hug the left edge. Icon-only (e.g. paused): center the
+      // glyph exactly like a native bar icon so the click highlight lines up.
+      anchors.leftMargin: scrollClip.visible ? button.contentLeftMargin
+        : Math.max(0, (button.width - barGlyph.width) / 2)
       anchors.verticalCenter: parent.verticalCenter
       spacing: Style.space(6)
       enabled: false
