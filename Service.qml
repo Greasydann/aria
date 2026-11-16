@@ -4521,7 +4521,8 @@ Item {
   NativeSession {
     id: authManager
     pluginDir: root.pluginDir
-    enabled: daemonManager.playbackReady && !daemonManager.usingFallbackRuntime
+    // Spoty uses Soloist for local playback; avoid embedded backend session/socket churn.
+    enabled: false
   }
 
   SpotifyApi {
@@ -4545,7 +4546,8 @@ Item {
 
   BackendClient {
     id: backendClient
-    wanted: daemonManager.running && !daemonManager.usingFallbackRuntime
+    // Spoty uses Soloist for local playback; keep embedded backend client disabled.
+    wanted: false
     onErrorCodeChanged: if (errorCode === "audio_key_unavailable")
       root.fail(errorMessage || "Spotify could not play this track on this computer")
   }
