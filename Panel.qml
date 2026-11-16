@@ -3736,8 +3736,7 @@ Item {
               // hover/cursor fill are the same size as the rest of the rail.
               height: sidebar.spreadIcons ? Style.space(30) : implicitHeight
               text: root.compactWidth ? "" : "Settings"
-              iconText: root.compactWidth ? ""
-                : (root.service && root.service.auth.loggedIn ? "󰀄" : "󰒓")
+              iconText: root.compactWidth ? "" : "󰒓"
               foreground: root.foreground
               selected: root.currentTab === "setup"
               leftAlign: !root.compactWidth
@@ -3750,7 +3749,7 @@ Item {
               OpticalGlyph {
                 anchors.fill: parent
                 visible: root.compactWidth
-                text: root.service && root.service.auth.loggedIn ? "󰀄" : "󰒓"
+                text: "󰒓"
                 color: parent.selected
                   ? Style.selectedStateColor(root.foreground, root.accent)
                   : root.foreground
