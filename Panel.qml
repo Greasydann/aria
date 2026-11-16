@@ -3718,6 +3718,9 @@ Item {
               anchors.leftMargin: sidebar.spreadIcons ? Style.space(2) : Style.space(8)
               anchors.rightMargin: sidebar.spreadIcons ? Style.space(2) : Style.space(8)
               anchors.bottomMargin: Style.space(8)
+              // Match the other spread-rail controls, so the icon and its
+              // hover/cursor fill are the same size as the rest of the rail.
+              height: sidebar.spreadIcons ? Style.space(30) : implicitHeight
               text: root.compactWidth ? "" : "Settings"
               iconText: root.compactWidth ? ""
                 : (root.service && root.service.auth.loggedIn ? "󰀄" : "󰒓")
