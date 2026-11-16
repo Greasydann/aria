@@ -79,6 +79,10 @@ Item {
       outcome: error ? (status ? "http-error" : "transport-error") : "success"
     }
     diagnostics = diagnostics.concat([entry]).slice(-100)
+    // Spoty debug: surface every failed request with its endpoint, so error
+    // toasts can be traced to the exact call that produced them.
+    if (error) console.warn("spoty api fail:", entry.method, entry.route,
+      "status", status, "-", String(error).slice(0, 120))
     releaseRequestSlot(job.handle)
     callbackIfCurrent(job, status, payload, error, xhr)
   }

@@ -369,6 +369,17 @@ BarWidget {
     miniCursor = actions.indexOf("play") >= 0 ? "play" : actions[0]
   }
 
+  // Mouse hover drives the cursor model too, but leaving the button must
+  // hand the highlight back: otherwise the last-hovered control keeps the
+  // cursor fill after the mouse moves away.
+  function hoverMiniCursor(action, hovered) {
+    if (hovered) {
+      setMiniCursor(action)
+      return
+    }
+    miniCursorActive = false
+  }
+
   function setMiniCursor(action) {
     if (miniKeyboardActions.indexOf(action) < 0) return
     miniCursor = action
@@ -913,7 +924,7 @@ BarWidget {
             hasCursor: root.miniCursorActive && root.miniCursor === "setup"
             enabled: root.spotify && !root.spotify.loginBusy
             onClicked: root.activateMiniAction("setup")
-            onHovered: function(on) { if (on) root.setMiniCursor("setup") }
+            onHovered: function(on) { root.hoverMiniCursor("setup", on) }
           }
 
           Button {
@@ -922,7 +933,7 @@ BarWidget {
             visible: root.spotify && root.spotify.loginBusy
             hasCursor: root.miniCursorActive && root.miniCursor === "setup-cancel"
             onClicked: if (root.spotify) root.spotify.cancelLogin()
-            onHovered: function(on) { if (on) root.setMiniCursor("setup-cancel") }
+            onHovered: function(on) { root.hoverMiniCursor("setup-cancel", on) }
           }
         }
       }
@@ -1113,9 +1124,7 @@ BarWidget {
                     ? "Remove like" : "Like this song"))
               onClicked: if (root.spotify)
                 root.spotify.toggleCurrentTrackSaved()
-              onHovered: function(on) {
-                if (on) root.setMiniCursor("like")
-              }
+              onHovered: function(on) { root.hoverMiniCursor("like", on) }
             }
           }
 
@@ -1154,7 +1163,7 @@ BarWidget {
 
             HoverHandler {
               id: miniArtistHover
-              onHoveredChanged: if (hovered) root.setMiniCursor("artist")
+              onHoveredChanged: root.hoverMiniCursor("artist", hovered)
             }
             PanelToolTip {
               visible: miniArtistHover.hovered
@@ -1198,7 +1207,7 @@ BarWidget {
 
             HoverHandler {
               id: miniAlbumHover
-              onHoveredChanged: if (hovered) root.setMiniCursor("album")
+              onHoveredChanged: root.hoverMiniCursor("album", hovered)
             }
             PanelToolTip {
               visible: miniAlbumHover.hovered
@@ -1246,7 +1255,7 @@ BarWidget {
           }
 
           HoverHandler {
-            onHoveredChanged: if (hovered) root.setMiniCursor("seek")
+            onHoveredChanged: root.hoverMiniCursor("seek", hovered)
           }
           KeyHint {
             sequences: ["Shift+Left", "Shift+Right"]
@@ -1292,7 +1301,7 @@ BarWidget {
           tooltipText: "Shuffle · Ctrl+S"
           enabled: root.spotify && root.spotify.playbackControllable
           onClicked: if (root.spotify) root.spotify.setShuffle(!root.spotify.shuffle)
-          onHovered: function(on) { if (on) root.setMiniCursor("shuffle") }
+          onHovered: function(on) { root.hoverMiniCursor("shuffle", on) }
           KeyHint { sequences: ["Ctrl+S"] }
         }
 
@@ -1303,7 +1312,7 @@ BarWidget {
           tooltipText: "Previous · Ctrl+Left"
           enabled: root.spotify && root.spotify.playbackControllable
           onClicked: if (root.spotify) root.spotify.previous()
-          onHovered: function(on) { if (on) root.setMiniCursor("previous") }
+          onHovered: function(on) { root.hoverMiniCursor("previous", on) }
           KeyHint { sequences: ["Ctrl+Left"] }
         }
 
@@ -1318,7 +1327,7 @@ BarWidget {
               ? "Resume last played" : "Play")) + " · Space"
           enabled: root.spotify && root.spotify.playbackStartable
           onClicked: if (root.spotify) root.spotify.togglePlayback()
-          onHovered: function(on) { if (on) root.setMiniCursor("play") }
+          onHovered: function(on) { root.hoverMiniCursor("play", on) }
           KeyHint { sequences: ["Space"] }
         }
 
@@ -1329,7 +1338,7 @@ BarWidget {
           tooltipText: "Next · Ctrl+Right"
           enabled: root.spotify && root.spotify.playbackControllable
           onClicked: if (root.spotify) root.spotify.next()
-          onHovered: function(on) { if (on) root.setMiniCursor("next") }
+          onHovered: function(on) { root.hoverMiniCursor("next", on) }
           KeyHint { sequences: ["Ctrl+Right"] }
         }
 
@@ -1342,7 +1351,7 @@ BarWidget {
             ? root.spotify.repeatMode : "off") + " · Ctrl+R"
           enabled: root.spotify && root.spotify.playbackControllable
           onClicked: if (root.spotify) root.spotify.cycleRepeat()
-          onHovered: function(on) { if (on) root.setMiniCursor("repeat") }
+          onHovered: function(on) { root.hoverMiniCursor("repeat", on) }
           KeyHint { sequences: ["Ctrl+R"] }
         }
 
@@ -1353,7 +1362,7 @@ BarWidget {
           tooltipText: "Open lyrics in Omasing · Ctrl+Shift+L"
           enabled: root.spotify && root.spotify.lyricsAvailable
           onClicked: root.openLyrics()
-          onHovered: function(on) { if (on) root.setMiniCursor("lyrics") }
+          onHovered: function(on) { root.hoverMiniCursor("lyrics", on) }
           KeyHint { sequences: ["Ctrl+Shift+L"] }
         }
       }
@@ -1403,7 +1412,7 @@ BarWidget {
         }
 
         HoverHandler {
-          onHoveredChanged: if (hovered) root.setMiniCursor("volume")
+          onHoveredChanged: root.hoverMiniCursor("volume", hovered)
         }
         KeyHint {
           sequences: ["M", "Ctrl+Up", "Ctrl+Down"]
@@ -1451,7 +1460,7 @@ BarWidget {
           hasCursor: root.miniCursorActive && root.miniCursor === "open"
           tooltipText: "Open full player · O"
           onClicked: root.openFullPanel()
-          onHovered: function(on) { if (on) root.setMiniCursor("open") }
+          onHovered: function(on) { root.hoverMiniCursor("open", on) }
           KeyHint { sequences: ["O"] }
         }
       }
@@ -1499,7 +1508,7 @@ BarWidget {
             hasCursor: root.miniCursorActive && root.miniCursor === "help-close"
             tooltipText: "Close shortcut reference · Ctrl+/ or Esc"
             onClicked: root.toggleMiniShortcutHelp()
-            onHovered: function(on) { if (on) root.setMiniCursor("help-close") }
+            onHovered: function(on) { root.hoverMiniCursor("help-close", on) }
             KeyHint {
               sequences: ["Esc", "Ctrl+/"]
               active: root.shortcutHintsInPopup
