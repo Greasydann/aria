@@ -615,6 +615,24 @@ BarWidget {
         color: button.foreground
         fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
         fontSize: root.iconOnly ? Math.round(Style.bar.iconFont * 0.9) : Style.font.body
+      
+        // Invisible anchor the bar reads to size and place the open-panel
+        // indicator. Living inside the glyph (and centered on it) keeps the
+        // mark under the icon no matter where the widget sits in the bar or
+        // how its slot is sized. Bar.qml draws the final mark at
+        // mark.width * 0.55, so the anchor is pre-scaled for the wanted
+        // on-screen extent; the cap keeps it from spilling past the
+        // widget's left edge while the icon hugs it.
+        Item {
+          id: panelIndicatorMark
+          anchors.centerIn: parent
+          readonly property real glyphCenter: button.contentLeftMargin
+            + barGlyph.width / 2
+          width: Math.min(button.width * 0.5 / 0.55, glyphCenter * 2,
+            Style.bar.iconSlot * 1.2)
+          height: button.height
+          visible: false
+        }
       }
 
       Item {
@@ -700,23 +718,6 @@ BarWidget {
           }
         }
       }
-    }
-
-    // Invisible anchor the bar reads to size and place the open-panel
-    // indicator. Bar.qml draws the final mark at mark.width * 0.55, so the
-    // anchor is pre-scaled for the wanted on-screen extent. The mark is
-    // always centered on the Spotify glyph (glyph x is Row-relative, hence
-    // the contentLeftMargin) and never hangs past the widget's left edge.
-    Item {
-      id: panelIndicatorMark
-      readonly property real glyphCenter: button.contentLeftMargin
-        + barGlyph.x + barGlyph.width / 2
-      width: Math.min(button.width * 0.5 / 0.55, glyphCenter * 2,
-        Style.bar.iconSlot * 1.2)
-      height: button.height
-      x: glyphCenter - width / 2
-      y: 0
-      visible: false
     }
 
     onPressed: function(mouseButton) {
