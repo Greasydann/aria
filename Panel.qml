@@ -3380,18 +3380,23 @@ Item {
               for (i = 0; i < primaryNavigation.children.length; i++) {
                 var navChild = primaryNavigation.children[i]
                 if (navChild.visible === false) continue
-                content += navChild.implicitHeight
+                content += Math.max(navChild.implicitHeight, navChild.height)
                 items += 1
               }
               for (i = 0; i < libraryNavigation.children.length; i++) {
                 var libChild = libraryNavigation.children[i]
                 if (libChild.visible === false) continue
-                content += libChild.implicitHeight
+                content += Math.max(libChild.implicitHeight, libChild.height)
                 items += 1
               }
               // One extra gap: the space between the two icon groups.
               var gapCount = Math.max(1, items - 1)
               var available = setupNavButton.y - primaryNavigation.y
+              // Explicit control heights (bigger icons) win over implicit
+              // ones when both exist.
+              var measured = function(child) {
+                return Math.max(child.implicitHeight, child.height)
+              }
               return Math.max(Style.space(2), Math.floor(
                 (available - content) / gapCount))
             }
@@ -3446,7 +3451,11 @@ Item {
               anchors.left: parent.left
               anchors.right: parent.right
               anchors.top: brandRow.visible ? brandRow.bottom : parent.top
-              anchors.margins: Style.space(8)
+              // In the spread rail the controls run nearly edge to edge,
+              // leaving only a tiny gap, like the horizontal icon row.
+              anchors.leftMargin: sidebar.spreadIcons ? Style.space(2) : Style.space(8)
+              anchors.rightMargin: sidebar.spreadIcons ? Style.space(2) : Style.space(8)
+              anchors.topMargin: Style.space(8)
               spacing: sidebar.spreadIcons ? sidebar.iconGap : Style.space(2)
 
               PanelSeparator {
@@ -3461,6 +3470,7 @@ Item {
                   required property var modelData
                   readonly property bool radioEntry: modelData.id === "radio"
                   width: primaryNavigation.width
+                  height: sidebar.spreadIcons ? Style.space(30) : implicitHeight
                   text: root.compactWidth ? "" : modelData.label
                   iconText: root.compactWidth ? "" : modelData.icon
                   foreground: root.foreground
@@ -3495,7 +3505,10 @@ Item {
                       ? Style.selectedStateColor(root.foreground, root.accent)
                       : root.foreground
                     fontFamily: root.fontFamily
-                    fontSize: Style.font.icon
+                    // Match the rail logo's scale: the spread icons read at
+                    // the same size as the horizontal layout's row.
+                    fontSize: sidebar.spreadIcons ? Style.font.iconLarge
+                      : Style.font.icon
                   }
                 }
               }
@@ -3529,13 +3542,14 @@ Item {
               anchors.right: parent.right
               anchors.top: playlistShortcutsHeading.visible
                 ? playlistShortcutsHeading.bottom : primaryNavigation.bottom
-              anchors.leftMargin: Style.space(8)
-              anchors.rightMargin: Style.space(8)
+              anchors.leftMargin: sidebar.spreadIcons ? Style.space(2) : Style.space(8)
+              anchors.rightMargin: sidebar.spreadIcons ? Style.space(2) : Style.space(8)
               anchors.topMargin: sidebar.spreadIcons ? sidebar.iconGap : Style.space(6)
               spacing: sidebar.spreadIcons ? sidebar.iconGap : Style.space(2)
 
               Button {
                 width: parent.width
+                height: sidebar.spreadIcons ? Style.space(30) : implicitHeight
                 text: root.compactWidth ? "" : "Liked Songs"
                 iconText: root.compactWidth ? "" : "󰋑"
                 foreground: root.foreground
@@ -3559,7 +3573,8 @@ Item {
                     ? Style.selectedStateColor(root.foreground, root.accent)
                     : root.foreground
                   fontFamily: root.fontFamily
-                  fontSize: Style.font.icon
+                  fontSize: sidebar.spreadIcons ? Style.font.iconLarge
+                    : Style.font.icon
                 }
               }
 
@@ -3572,6 +3587,7 @@ Item {
                   width: root.compactWidth ? parent.width
                     : Math.max(20, parent.width - createPlaylistShortcut.width
                       - parent.spacing)
+                  height: sidebar.spreadIcons ? Style.space(30) : implicitHeight
                   text: root.compactWidth ? "" : "Playlists"
                   iconText: root.compactWidth ? "" : "󱁐"
                   foreground: root.foreground
@@ -3595,7 +3611,8 @@ Item {
                       ? Style.selectedStateColor(root.foreground, root.accent)
                       : root.foreground
                     fontFamily: root.fontFamily
-                    fontSize: Style.font.icon
+                    fontSize: sidebar.spreadIcons ? Style.font.iconLarge
+                      : Style.font.icon
                   }
                 }
 
@@ -3603,6 +3620,7 @@ Item {
                   id: createPlaylistShortcut
                   width: root.compactWidth
                     ? parent.width : implicitWidth
+                  height: sidebar.spreadIcons ? Style.space(30) : implicitHeight
                   text: "+"
                   foreground: root.foreground
                   fontSize: Style.font.subtitle
@@ -3697,7 +3715,9 @@ Item {
               anchors.left: parent.left
               anchors.right: parent.right
               anchors.bottom: parent.bottom
-              anchors.margins: Style.space(8)
+              anchors.leftMargin: sidebar.spreadIcons ? Style.space(2) : Style.space(8)
+              anchors.rightMargin: sidebar.spreadIcons ? Style.space(2) : Style.space(8)
+              anchors.bottomMargin: Style.space(8)
               text: root.compactWidth ? "" : "Settings"
               iconText: root.compactWidth ? ""
                 : (root.service && root.service.auth.loggedIn ? "󰀄" : "󰒓")
@@ -3720,7 +3740,8 @@ Item {
                   ? Style.selectedStateColor(root.foreground, root.accent)
                   : root.foreground
                 fontFamily: root.fontFamily
-                fontSize: Style.font.icon
+                fontSize: sidebar.spreadIcons ? Style.font.iconLarge
+                  : Style.font.icon
               }
             }
           }
