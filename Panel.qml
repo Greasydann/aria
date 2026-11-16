@@ -3366,6 +3366,36 @@ Item {
             color: Style.normalFillFor(root.foreground, root.accent)
             borderSpec: Border.controlSpec("normal", root.foreground, root.accent)
 
+            // Narrow rail (compact width): the icon stack spreads over the
+            // full rail height — the vertical mirror of how the narrow
+            // horizontal layout spreads its icons across the panel width.
+            // Wide mode keeps the tight stack and spends the room on the
+            // playlist list instead.
+            readonly property bool spreadIcons: root.compactWidth
+            readonly property real iconGap: {
+              if (!spreadIcons) return Style.space(2)
+              var content = 0
+              var items = 0
+              var i
+              for (i = 0; i < primaryNavigation.children.length; i++) {
+                var navChild = primaryNavigation.children[i]
+                if (navChild.visible === false) continue
+                content += navChild.implicitHeight
+                items += 1
+              }
+              for (i = 0; i < libraryNavigation.children.length; i++) {
+                var libChild = libraryNavigation.children[i]
+                if (libChild.visible === false) continue
+                content += libChild.implicitHeight
+                items += 1
+              }
+              // One extra gap: the space between the two icon groups.
+              var gapCount = Math.max(1, items - 1)
+              var available = setupNavButton.y - primaryNavigation.y
+              return Math.max(Style.space(2), Math.floor(
+                (available - content) / gapCount))
+            }
+
             Row {
               id: brandRow
               visible: !root.compactHeight
@@ -3417,7 +3447,7 @@ Item {
               anchors.right: parent.right
               anchors.top: brandRow.visible ? brandRow.bottom : parent.top
               anchors.margins: Style.space(8)
-              spacing: Style.space(2)
+              spacing: sidebar.spreadIcons ? sidebar.iconGap : Style.space(2)
 
               PanelSeparator {
                 width: parent.width
@@ -3501,8 +3531,8 @@ Item {
                 ? playlistShortcutsHeading.bottom : primaryNavigation.bottom
               anchors.leftMargin: Style.space(8)
               anchors.rightMargin: Style.space(8)
-              anchors.topMargin: Style.space(6)
-              spacing: Style.space(2)
+              anchors.topMargin: sidebar.spreadIcons ? sidebar.iconGap : Style.space(6)
+              spacing: sidebar.spreadIcons ? sidebar.iconGap : Style.space(2)
 
               Button {
                 width: parent.width
