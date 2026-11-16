@@ -1912,8 +1912,18 @@ Item {
       })
   }
 
-  function toggleSaved(item) {
-    if (!item || !item.uri || item.type === "chapter" || isSavedBusy(item)) return
+  // Drop the selection left behind by a deleted playlist: the playlists
+  // page falls back to its picker, and the item list empties out.
+  function clearPlaylistSelection() {
+    selectedPlaylist = null
+    playlistItems = []
+    playlistItemsNext = ""
+    playlistItemsError = ""
+    playlistRestoreTargetCount = 0
+    if (detailItem && detailItem.type === "playlist") detailItem = null
+  }
+
+  function toggleSaved(item) {    if (!item || !item.uri || item.type === "chapter" || isSavedBusy(item)) return
     var removing = isSaved(item)
     var track = item.type === "track"
     setSavedBusy(item.uri, true)
@@ -1934,6 +1944,13 @@ Item {
         else if (item.type === "audiobook" && root.savedAudiobooksLoaded)
           root.loadSavedAudiobooks(false)
         if (item.type === "playlist" && root.playlistsLoaded) root.loadPlaylists(false)
+        // Removing a playlist from the library deletes it. If it was the
+        // one on screen, drop the stale selection so the playlists page
+        // resets to its picker instead of showing a phantom playlist.
+        if (item.type === "playlist" && removing && root.selectedPlaylist
+            && String(root.selectedPlaylist.id) === String(item.id)) {
+          root.clearPlaylistSelection()
+        }
       })
   }
 
