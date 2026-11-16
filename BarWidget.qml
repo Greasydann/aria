@@ -29,6 +29,10 @@ BarWidget {
     String(root.setting("showVinylRecord", "Off")) === "On"
   readonly property bool iconOnly: !spotify || vertical || !spotify.hasMedia
     || barText === ""
+  // The bar centers its open-panel indicator (the small mark under the
+  // widget while its panel is open) on this item, so the mark tracks the
+  // Spotify glyph instead of the middle of the whole widget.
+  readonly property alias openPanelIndicatorItem: panelIndicatorMark
   property bool popupOpen: false
   property bool contextMenuVisible: false
   property bool lyricsInstallPromptVisible: false
@@ -582,7 +586,7 @@ BarWidget {
         ? "Set up Omarchy Spotify" : "Omarchy Spotify")
     readonly property real contentLeftMargin: scaledHorizontalMargin
     readonly property real fittedWidth: Math.ceil(barGlyph.width
-      + (scrollClip.visible ? (Style.space(6) + barLabel.implicitWidth) : 0)
+      + (scrollClip.visible ? (barContent.spacing + barLabel.implicitWidth) : 0)
       + scaledHorizontalMargin * 2)
     readonly property real barTextCap: root.spotify ? root.spotify.maxBarTextWidth : 240
 
@@ -594,104 +598,119 @@ BarWidget {
     fixedHeight: root.vertical && root.iconOnly ? Style.bar.iconSlot : -1
     clip: true
 
-    OpticalGlyph {
-      id: barGlyph
-      // The glyph never moves: always horizontally centered in the widget,
-      // whether the scrolling title/artist text is showing or not.
-      anchors.horizontalCenter: parent.horizontalCenter
+    Row {
+      id: barContent
+      anchors.left: parent.left
+      anchors.leftMargin: button.contentLeftMargin
       anchors.verticalCenter: parent.verticalCenter
-      width: Style.space(16)
-      height: Style.space(16)
-      text: "\uf1bc"
-      color: button.foreground
-      fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-      fontSize: root.iconOnly ? Math.round(Style.bar.iconFont * 0.9) : Style.font.body
-    }
+      spacing: Style.space(6)
+      enabled: false
 
-    Item {
-      id: scrollClip
-      visible: !root.iconOnly
-      // Text lives entirely to the right of the centered glyph.
-      x: Math.min((button.width + barGlyph.width) / 2 + Style.space(6),
-        button.width - button.contentLeftMargin)
-      width: Math.max(0, button.width - x - button.contentLeftMargin)
-      height: barGlyph.height
-      anchors.verticalCenter: parent.verticalCenter
-      clip: barLabel.needsScroll
-
-      readonly property bool scrolling: root.spotify && root.spotify.scrollBarText
-        && barLabel.needsScroll && root.spotify.hasMedia && root.spotify.playing
-        && !root.popupOpen && !root.vertical
-      // Use a wide enough ramp to read as a deliberate fade at bar scale.
-      readonly property real fadeStop: width > 0
-        ? Math.min(0.2, Style.space(28) / width) : 0
+      OpticalGlyph {
+        id: barGlyph
+        anchors.verticalCenter: parent.verticalCenter
+        width: Style.space(16)
+        height: Style.space(16)
+        text: ""
+        color: button.foreground
+        fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+        fontSize: root.iconOnly ? Math.round(Style.bar.iconFont * 0.9) : Style.font.body
+      }
 
       Item {
-        id: labelLayer
-        anchors.fill: parent
-        layer.enabled: scrollClip.scrolling
-        layer.smooth: true
-        layer.effect: MultiEffect {
-          autoPaddingEnabled: false
-          maskEnabled: true
-          maskSource: scrollFadeMask
-          maskThresholdMin: 0.5
-          maskSpreadAtMin: 1
+        id: scrollClip
+        visible: !root.iconOnly
+        width: Math.max(0, button.width - barGlyph.width
+          - barContent.spacing - button.scaledHorizontalMargin * 2)
+        height: barGlyph.height
+        anchors.verticalCenter: parent.verticalCenter
+        clip: barLabel.needsScroll
+
+        readonly property bool scrolling: root.spotify && root.spotify.scrollBarText
+          && barLabel.needsScroll && root.spotify.hasMedia && root.spotify.playing
+          && !root.popupOpen && !root.vertical
+        // Use a wide enough ramp to read as a deliberate fade at bar scale.
+        readonly property real fadeStop: width > 0
+          ? Math.min(0.2, Style.space(28) / width) : 0
+
+        Item {
+          id: labelLayer
+          anchors.fill: parent
+          layer.enabled: scrollClip.scrolling
+          layer.smooth: true
+          layer.effect: MultiEffect {
+            autoPaddingEnabled: false
+            maskEnabled: true
+            maskSource: scrollFadeMask
+            maskThresholdMin: 0.5
+            maskSpreadAtMin: 1
+          }
+
+          Text {
+            id: barLabel
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.barText
+            color: button.foreground
+            font.family: root.bar ? root.bar.fontFamily : Style.font.family
+            font.pixelSize: Style.font.body
+            renderType: Text.NativeRendering
+
+            readonly property bool needsScroll: implicitWidth > scrollClip.width
+
+            // Keep the marquee on the render thread so it remains smooth
+            // without dispatching JavaScript timer callbacks through the
+            // shared shell's main thread.
+            XAnimator on x {
+              id: barScrollAnimation
+              running: scrollClip.scrolling
+              loops: Animation.Infinite
+              duration: Math.round(Math.max(6000, implicitWidth * 25)
+                / Math.max(0.25, root.spotify ? root.spotify.scrollSpeed : 1))
+              from: scrollClip.width
+              to: -implicitWidth
+              easing.type: Easing.Linear
+              onStopped: barLabel.x = 0
+            }
+          }
         }
 
-        Text {
-          id: barLabel
-          anchors.verticalCenter: parent.verticalCenter
-          text: root.barText
-          color: button.foreground
-          font.family: root.bar ? root.bar.fontFamily : Style.font.family
-          font.pixelSize: Style.font.body
-          renderType: Text.NativeRendering
-
-          readonly property bool needsScroll: implicitWidth > scrollClip.width
-
-          // Keep the marquee on the render thread so it remains smooth
-          // without dispatching JavaScript timer callbacks through the
-          // shared shell's main thread.
-          XAnimator on x {
-            id: barScrollAnimation
-            running: scrollClip.scrolling
-            loops: Animation.Infinite
-            duration: Math.round(Math.max(6000, implicitWidth * 25)
-              / Math.max(0.25, root.spotify ? root.spotify.scrollSpeed : 1))
-            from: scrollClip.width
-            to: -implicitWidth
-            easing.type: Easing.Linear
-            onStopped: barLabel.x = 0
+        Rectangle {
+          id: scrollFadeMask
+          anchors.fill: parent
+          visible: false
+          layer.enabled: scrollClip.scrolling
+          gradient: Gradient {
+            orientation: Gradient.Horizontal
+            GradientStop {
+              position: 0
+              color: "transparent"
+            }
+            GradientStop {
+              position: scrollClip.fadeStop
+              color: "white"
+            }
+            GradientStop {
+              position: 1 - scrollClip.fadeStop
+              color: "white"
+            }
+            GradientStop {
+              position: 1
+              color: "transparent"
+            }
           }
         }
       }
+    }
 
-      Rectangle {
-        id: scrollFadeMask
-        anchors.fill: parent
-        visible: false
-        layer.enabled: scrollClip.scrolling
-        gradient: Gradient {
-          orientation: Gradient.Horizontal
-          GradientStop {
-            position: 0
-            color: "transparent"
-          }
-          GradientStop {
-            position: scrollClip.fadeStop
-            color: "white"
-          }
-          GradientStop {
-            position: 1 - scrollClip.fadeStop
-            color: "white"
-          }
-          GradientStop {
-            position: 1
-            color: "transparent"
-          }
-        }
-      }
+    // Invisible anchor the bar reads to center the open-panel indicator
+    // over the Spotify glyph, whatever the scrolling text is doing.
+    Item {
+      id: panelIndicatorMark
+      width: Style.bar.iconSlot
+      height: 1
+      x: barGlyph.x + barGlyph.width / 2 - width / 2
+      y: barGlyph.y + barGlyph.height / 2 - height / 2
+      visible: false
     }
 
     onPressed: function(mouseButton) {
