@@ -602,7 +602,7 @@ BarWidget {
       anchors.verticalCenter: parent.verticalCenter
       width: Style.space(16)
       height: Style.space(16)
-      text: ""
+      text: "\uf1bc"
       color: button.foreground
       fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
       fontSize: root.iconOnly ? Math.round(Style.bar.iconFont * 0.9) : Style.font.body
