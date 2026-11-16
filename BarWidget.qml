@@ -726,11 +726,22 @@ BarWidget {
               id: barScrollAnimation
               running: scrollClip.scrolling
               loops: Animation.Infinite
-              duration: Math.round(Math.max(6000, implicitWidth * 25)
-                / Math.max(0.25, root.spotify ? root.spotify.scrollSpeed : 1))
+              // Constant pace over the whole loop: enter from the right,
+              // scroll the label fully out to the left. The label width
+              // must be referenced through its id — an unqualified
+              // implicitWidth resolves to the widget's own (the root
+              // button), which made short titles crawl at the duration
+              // floor and long titles restart before fully exiting. The
+              // pace follows the scroll-speed setting: 1 = 40 px/s.
+              duration: Math.max(1500, Math.round(
+                (scrollClip.width + barLabel.implicitWidth) * 25
+                / Math.max(0.25, root.spotify ? root.spotify.scrollSpeed : 1)))
               from: scrollClip.width
-              to: -implicitWidth
+              to: -barLabel.implicitWidth
               easing.type: Easing.Linear
+              // A changed duration only takes effect on the next start,
+              // so re-apply it live (speed setting edits mid-scroll).
+              onDurationChanged: if (running) barScrollAnimation.restart()
               onStopped: barLabel.x = 0
             }
           }
