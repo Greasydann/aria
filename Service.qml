@@ -2670,10 +2670,15 @@ Item {
   }
 
   function loadHome() {
-    // The native login session proxies real Web API requests (search,
-    // library, playlists and playback state all run through it), so the
-    // history and top-ranking endpoints work the same way — the old
-    // embedded-engine gate does not apply to Spoty.
+    // The omarchy-spotify backend answers 501 for the history and
+    // top-ranking endpoints under native sign-in (its streaming token
+    // cannot read them), so keep the page gracefully empty instead of
+    // surfacing an error. A full-scope panel login could lift this later.
+    if (spotifyApi.nativeSession) {
+      homeRequestsPending = 0
+      homeLoaded = true
+      return
+    }
     if (homeLoading) return
     var expected = dataSerial
     homeLoaded = false
