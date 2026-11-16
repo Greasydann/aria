@@ -2763,6 +2763,29 @@ Item {
   function mergeConnectDevices() {
     var local = spotifyConnectManager.devices || []
     var current = remoteDevice && remoteDevice.active === true ? remoteDevice : null
+    // The Soloist fallback device is synthetic ("soloist:spoty"). Resolve it
+    // to the real Soloist Connect device so it never appears as a duplicate
+    // phantom entry next to the actual device.
+    if (current && String(current.id || "") === "soloist:spoty") {
+      var resolved = null
+      for (var resolveIndex = 0; resolveIndex < apiDevices.length; resolveIndex++) {
+        var resolveCandidate = apiDevices[resolveIndex]
+        if (resolveCandidate && resolveCandidate.id
+            && isSoloistName(resolveCandidate.sourceName || resolveCandidate.name)) {
+          resolved = resolveCandidate
+          break
+        }
+      }
+      if (resolved) {
+        current = Api.shallowCopy(current)
+        current.id = String(resolved.id)
+        current.type = String(resolved.type || current.type || "")
+        current.name = String(resolved.name || current.name || "")
+        current.sourceName = String(resolved.sourceName || resolved.name || "")
+      } else {
+        current = null
+      }
+    }
     var currentVolume = Api.normalizeVolumePercent(
       current ? current.volumePercent : null)
     // Merging old discovery data must never overwrite a newer volume.
