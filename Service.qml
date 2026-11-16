@@ -3689,6 +3689,9 @@ Item {
   function loadResumeCandidate(force) {
     if (resumeCandidateLoading) return
     if (!authManager.loggedIn && !authManager.tokenIsFresh()) return
+    // The native streaming token cannot read listening history; use the
+    // panel's full-scope OAuth session when it is signed in.
+    if (!webAuthManager.loggedIn) return
     if (force !== true && resumeCandidateLoadedAt > 0
         && Date.now() - resumeCandidateLoadedAt < 30000) return
     var expected = dataSerial
@@ -3701,7 +3704,7 @@ Item {
         if (error) return
         root.resumeCandidate = Api.resumeCandidateFromRecentlyPlayed(payload, 192)
         root.resumeCandidateLoadedAt = Date.now()
-      })
+      }, { useAuth: true })
   }
 
   // Nothing is loaded, so a plain resume has no context to continue. Start the
