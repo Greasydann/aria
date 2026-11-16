@@ -1794,6 +1794,19 @@ Item {
     loadPlaylists(true)
   }
 
+  // Page through every playlist in the background (chained on each page's
+  // completion), so the compact page's picker can offer all of them. Stops
+  // at a generous cap and only continues while pages make progress.
+  function ensureAllPlaylists() {
+    if (playlistsLoading || playlistsNext === "" || playlists.length >= 300) {
+      return
+    }
+    var before = playlists.length
+    loadPlaylists(true, function() {
+      if (root.playlists.length > before) Qt.callLater(root.ensureAllPlaylists)
+    })
+  }
+
   function loadSavedTracks(append, callback, serial) {
     loadLibraryCollection("tracks", append, callback, serial)
   }

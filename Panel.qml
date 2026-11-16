@@ -5664,6 +5664,7 @@ Item {
           spacing: Style.space(6)
 
           SearchableDropdown {
+            id: playlistDropdown
             visible: root.compactWidth
             width: parent.width
             height: visible ? implicitHeight : 0
@@ -5678,22 +5679,17 @@ Item {
             options: root.playlistOptions()
             value: root.service && root.service.selectedPlaylist
               ? String(root.service.selectedPlaylist.id) : ""
+            onPopupOpenChanged: {
+              // The picker reads the loaded playlist list; page through the
+              // rest in the background while it is open, so every playlist
+              // is reachable without a manual load-more button.
+              if (playlistDropdown.popupOpen && root.service)
+                root.service.ensureAllPlaylists()
+            }
             onChanged: function(value) {
               var playlist = root.service ? root.service.playlistById(value) : null
               if (playlist) root.service.openPlaylist(playlist)
             }
-          }
-
-          Button {
-            visible: root.compactWidth && root.service
-              && root.service.playlistsNext !== ""
-            width: parent.width
-            text: root.service && root.service.playlistsLoading
-              ? "Loading more playlists…" : "Load more playlists"
-            iconText: "󰑐"
-            foreground: root.foreground
-            enabled: root.service && !root.service.playlistsLoading
-            onClicked: root.service.loadMorePlaylists()
           }
 
           Row {
