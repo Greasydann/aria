@@ -2126,10 +2126,20 @@ Item {
       options.push({
         value: String(playlist.id),
         label: String(playlist.name || "Playlist"),
-        description: String(playlist.ownerName || "")
+        description: playlistOwnerLabel(playlist)
       })
     }
     return options
+  }
+
+  // Accounts without a chosen display name report their raw base62 user
+  // id (e.g. "31sbwsrcdvc5k2hc5uhqwfei47aa"); showing that under a
+  // playlist name reads like leaked debug data. Real names — even single
+  // words — never run that long without spaces or punctuation.
+  function playlistOwnerLabel(playlist) {
+    var owner = String((playlist && playlist.ownerName) || "")
+    if (!owner || /^[0-9A-Za-z]{16,}$/.test(owner)) return ""
+    return owner
   }
 
   function openExternal(item) {
