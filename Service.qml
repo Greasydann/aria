@@ -110,6 +110,41 @@ Item {
     return null
   }
 
+  // The real Soloist Spotify-Connect receiver, resolvable from the last
+  // live playback state or either device list. The synthetic fallback
+  // receiver ("soloist:spoty") is UI-only: Spotify's Web API does not know
+  // that id and answers 404 when a play request aims at it.
+  function realSoloistConnectDevice() {
+    var snapshot = soloistConnectSnapshot
+    if (snapshot && snapshot.id && String(snapshot.id) !== "soloist:spoty"
+        && isSoloistName(snapshot.sourceName || snapshot.name)) {
+      return snapshot
+    }
+    var lists = [apiDevices, spotifyConnectManager.devices]
+    for (var li = 0; li < lists.length; li++) {
+      var list = lists[li] || []
+      for (var i = 0; i < list.length; i++) {
+        var candidate = list[i]
+        if (candidate && candidate.id
+            && String(candidate.id) !== "soloist:spoty"
+            && isSoloistName(candidate.sourceName || candidate.name)) {
+          return candidate
+        }
+      }
+    }
+    return null
+  }
+
+  // Map a device id onto one Spotify's Web API can route. Unknown ids pass
+  // through; the synthetic Soloist receiver resolves to the real Connect
+  // id, or "" while Soloist's registration is not visible.
+  function playbackTargetId(deviceId) {
+    var id = String(deviceId || "")
+    if (id !== "soloist:spoty") return id
+    var real = realSoloistConnectDevice()
+    return real ? String(real.id) : ""
+  }
+
   function officialSpotifyMprisPlayer() {
     for (var i = 0; i < mprisPlayers.length; i++) {
       if (isOfficialSpotifyPlayer(mprisPlayers[i])) return mprisPlayers[i]
@@ -549,6 +584,10 @@ Item {
     && radioContextSelected && playing
   property bool localActivationRequested: false
   property int deviceProbeAttempts: 0
+  // The real Soloist Spotify-Connect receiver, as last reported by live
+  // playback state. The devices endpoint can blink Soloist out while it
+  // keeps playing; this snapshot keeps its routable id available.
+  property var soloistConnectSnapshot: null
   property int officialSpotifyLaunchWaitAttempts: 0
   property int localSocketWaitAttempts: 0
   property int visibleLocalDeviceRefreshAttempts: 0
@@ -1385,6 +1424,14 @@ Item {
       device.sourceName = device.name
       device.local = Api.isLocalPlaybackDevice(device, deviceName,
         localRuntimeDeviceName, localDeviceId)
+      // Remember Soloist's real Spotify-Connect receiver while it is the
+      // live playback device, so its routable id survives device-list
+      // blinks (the Soloist fallback replaces the UI state with the
+      // synthetic "soloist:spoty" receiver right after this).
+      if (device.id && String(device.id) !== "soloist:spoty"
+          && isSoloistName(device.sourceName || device.name)) {
+        soloistConnectSnapshot = Api.shallowCopy(device)
+      }
       if (device.local && device.id) {
         localDeviceId = device.id
         localRuntimeDeviceName = device.name
@@ -3253,9 +3300,10 @@ Item {
     // Spoty: Soloist is the single local playback target. The official
     // Spotify desktop app is never launched or targeted for audio.
     var soloist = soloistTarget()
-    if (soloist && soloist.id && String(soloist.id) !== "soloist:spoty") {
+    var soloistId = soloist ? playbackTargetId(soloist.id) : ""
+    if (soloistId) {
       localActivationRequested = false
-      sendPendingPlayback(soloist.id)
+      sendPendingPlayback(soloistId)
       return
     }
 
@@ -3370,11 +3418,12 @@ Item {
     loadDevices(function() {
       if (!root.pendingPlayback && !root.localActivationRequested) return
       var soloist = root.soloistDevice()
-      if (soloist && soloist.id) {
+      var soloistId = soloist ? root.playbackTargetId(soloist.id) : ""
+      if (soloistId) {
         root.localActivationRequested = false
         root.deviceProbeAttempts = 0
         if (root.pendingPlayback)
-          root.sendPendingPlayback(soloist.id)
+          root.sendPendingPlayback(soloistId)
         return
       }
       var target = root.pendingPlayback
@@ -3412,7 +3461,18 @@ Item {
       })
   }
 
-  function sendPendingPlayback(deviceId) {
+  function sendPendingPlayback(deviceIdInput) {
+    // The synthetic Soloist receiver is UI-only; resolve it to Soloist's
+    // real Spotify-Connect id before aiming anything at the Web API.
+    var deviceId = playbackTargetId(deviceIdInput)
+    if (!deviceId) {
+      // Soloist is the intended target but its Connect id is not visible
+      // right now (its registration blinks out of the device lists while
+      // it keeps playing). Keep the playback intent pending and probe for
+      // the receiver instead of sending a request Spotify cannot route.
+      deviceProbeTimer.restart()
+      return
+    }
     var body = pendingPlaybackBody
     var successMessage = pendingPlaybackMessage
     var radioPlaylist = pendingPlaybackRadio
