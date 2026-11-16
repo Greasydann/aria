@@ -222,8 +222,6 @@ Resource sampling:
 ./scripts/benchmark.sh idle 10
 ```
 
-See [Benchmark](BENCHMARK.md) for methodology and recorded results.
-
 ## Complete removal
 
 Run the bundled uninstaller from outside the plugin directory:
