@@ -26,6 +26,22 @@ Item {
   property string emptyMessage: "Nothing here yet."
   property real restoredContentY: 0
   property string stateKey: ""
+  // "Load more" appends by replacing the model array, which resets the
+  // Flickable to the top. Anchor the reader's position when the button is
+  // pressed, then re-apply it once the appended model settles, so a long
+  // list can be paged through without jumping back to the start.
+  property real loadMoreAnchorY: -1
+  property int loadMoreRestoreTicks: 0
+  function anchorForLoadMore() {
+    loadMoreAnchorY = mediaList.contentY
+    loadMoreRestoreTicks = 0
+  }
+  function settleLoadMore() {
+    if (loadMoreAnchorY < 0) return
+    loadMoreRestoreTicks = 0
+    loadMoreRestore.restart()
+  }
+  onSourceItemsChanged: settleLoadMore()
   property bool restoreReady: true
   property bool restoreApplied: false
   property bool keyboardSortSelected: false
@@ -265,6 +281,26 @@ Item {
   function resetRestore() {
     restoreApplied = false
     if (restoreReady) restoreTimer.restart()
+  }
+
+  Timer {
+    id: loadMoreRestore
+    interval: 16
+    repeat: true
+    onTriggered: {
+      root.loadMoreRestoreTicks++
+      if (root.loadMoreRestoreTicks > 12 || mediaList.count <= 0) return
+      var maximum = Math.max(mediaList.originY,
+        mediaList.contentHeight - mediaList.height + mediaList.originY)
+      var target = Math.max(mediaList.originY,
+        Math.min(maximum, root.loadMoreAnchorY))
+      mediaList.contentY = target
+      if (mediaList.contentY === target
+          && root.loadMoreRestoreTicks >= 3) {
+        root.loadMoreAnchorY = -1
+        loadMoreRestore.stop()
+      }
+    }
   }
 
   Timer {
@@ -518,7 +554,10 @@ Item {
       foreground: Theme.Color.foreground
       enabled: root.hasMore && !root.loading
       hasCursor: root.keyboardMoreSelected
-      onClicked: root.loadMoreRequested()
+      onClicked: {
+        root.anchorForLoadMore()
+        root.loadMoreRequested()
+      }
       ShortcutHint {
         active: root.keyboardHintsActive && root.keyboardMoreHint !== ""
         navHint: root.keyboardMoreHint
