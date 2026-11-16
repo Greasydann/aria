@@ -31,25 +31,34 @@ BarWidget {
     || barText === ""
   // The bar centers its open-panel indicator (the small mark under the
   // widget while its panel is open) on this item, so the mark tracks the
-  // Spotify glyph instead of the middle of the whole widget. Bar.qml
-  // measures the mark's position with mapToItem, which does not re-run on
-  // its own when our geometry changes, so two identical marks alternate
-  // whenever the widget moves or resizes. The value change forces the
-  // bar's center binding to re-measure with fresh coordinates.
-  property int panelMarkEpoch: 0
-  property bool panelMarkFlip: false
-  function bumpPanelMark() {
-    panelMarkEpoch++
-    panelMarkFlip = !panelMarkFlip
+  // Spotify glyph instead of the middle of the whole widget.
+  readonly property alias openPanelIndicatorItem: panelIndicatorMark
+  // Bar.qml measures the mark's position with mapToItem, whose binding only
+  // re-runs when a value it reads changes — mapped geometry changes are
+  // invisible to it (the tray's drawer solves this the same way, by
+  // exposing a moving revealProgress). While our panel is open, keep this
+  // value drifting so the bar re-measures the mark every frame and the
+  // mark stays under the icon through any layout shift, in every bar
+  // region. Nothing renders from it; it only feeds the bar's measurement.
+  property real revealProgress: 0
+  SequentialAnimation {
+    running: root.popupOpen
+    loops: Animation.Infinite
+    NumberAnimation {
+      target: root
+      property: "revealProgress"
+      from: 0
+      to: 1
+      duration: 250
+    }
+    NumberAnimation {
+      target: root
+      property: "revealProgress"
+      from: 1
+      to: 0
+      duration: 250
+    }
   }
-  property Item openPanelIndicatorItem: {
-    panelMarkEpoch
-    return panelMarkFlip ? panelIndicatorMarkAlt : panelIndicatorMark
-  }
-  onXChanged: bumpPanelMark()
-  onYChanged: bumpPanelMark()
-  onWidthChanged: bumpPanelMark()
-  onHeightChanged: bumpPanelMark()
   property bool popupOpen: false
   property bool contextMenuVisible: false
   property bool lyricsInstallPromptVisible: false
@@ -632,7 +641,7 @@ BarWidget {
         color: button.foreground
         fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
         fontSize: root.iconOnly ? Math.round(Style.bar.iconFont * 0.9) : Style.font.body
-      
+
         // Invisible anchor the bar reads to size and place the open-panel
         // indicator. Living inside the glyph (and centered on it) keeps the
         // mark under the icon no matter where the widget sits in the bar or
@@ -642,19 +651,6 @@ BarWidget {
         // widget's left edge while the icon hugs it.
         Item {
           id: panelIndicatorMark
-          anchors.centerIn: parent
-          readonly property real glyphCenter: button.contentLeftMargin
-            + barGlyph.width / 2
-          width: Math.min(button.width * 0.5 / 0.55, glyphCenter * 2,
-            Style.bar.iconSlot * 1.2)
-          height: button.height
-          visible: false
-        }
-
-        // Identical twin, alternating with the mark above so Bar.qml sees a
-        // value change and re-measures the (unchanged) on-screen position.
-        Item {
-          id: panelIndicatorMarkAlt
           anchors.centerIn: parent
           readonly property real glyphCenter: button.contentLeftMargin
             + barGlyph.width / 2
