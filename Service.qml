@@ -62,7 +62,7 @@ Item {
   readonly property string soloistDeviceName: "Spoty"
   readonly property var soloistDeviceNames: ["Spoty", "Spotty", "SoloistPC", "OmaSpotify (this PC)"]
 
-  readonly property string hostName: hostnameReader.text.trim()
+  readonly property string hostName: String(hostnameReader.text() || "").trim()
   readonly property var officialDesktopNames: ["omarchy", "omarchy spotify", "this computer"]
 
   // The official Spotify desktop app advertises itself under the machine's
