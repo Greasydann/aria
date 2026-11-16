@@ -17,6 +17,9 @@ Item {
   required property var auth
 
   property var nativeSession: null
+  // Optional second, full-scope OAuth session (panel-managed). Jobs flagged
+  // useAuth route through it; everything else keeps the native session.
+  property var webAuth: null
   property var searchRequest: null
   property int searchSerial: 0
   property var requestQueue: []
@@ -201,7 +204,7 @@ Item {
     }
     url = Api.appendQuery(url, job.query)
 
-    if (nativeSession) {
+    if (nativeSession && !job.useAuth) {
       job.sentAt = now()
       job.activeDeadlineAt = job.sentAt + 45000
       handle.xhr = nativeSession.request(job.method, job.path, job.query, job.body,
@@ -218,7 +221,8 @@ Item {
       return
     }
 
-    auth.withAccessToken(function(token, tokenError) {
+    var tokenSource = job.useAuth && webAuth ? webAuth : auth
+    tokenSource.withAccessToken(function(token, tokenError) {
       if (handle.aborted) {
         releaseRequestSlot(handle)
         return
@@ -239,7 +243,7 @@ Item {
           if (handle.aborted || job.finished === true) return
           var payload = Api.parseJson(xhr.responseText, null)
           if (xhr.status === 401 && job.retried !== true) {
-            auth.invalidateAccessToken()
+            tokenSource.invalidateAccessToken()
             job.activeDeadlineAt = 0
             job.retried = true
             requestQueue = Api.enqueueApiJob(requestQueue, job)
@@ -305,6 +309,7 @@ Item {
       rateLimitRetries: 0,
       retryRateLimit: settings.retryRateLimit !== false,
       priority: String(settings.priority || ""),
+      useAuth: settings.useAuth === true,
       timeoutMs: timeoutMs,
       queuedAt: queuedAt,
       deadlineAt: timeoutMs > 0 ? queuedAt + timeoutMs : 0,

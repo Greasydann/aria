@@ -234,7 +234,8 @@ Item {
       scrollSpeed: Api.normalizedScrollSpeed(draftScrollSpeed),
       maxBarTextWidth: Api.normalizedMaxBarTextWidth(draftMaxBarTextWidth),
       fixedBarWidth: draftFixedBarWidth ? "On" : "Off",
-      audioQuality: draftAudioQuality
+      audioQuality: draftAudioQuality,
+      clientId: String(draftClientId || "").trim().toLowerCase()
     }
     service.persistSettings(values)
     syncDraftSettings()
@@ -4700,6 +4701,44 @@ Item {
             root.rememberScroll("home:" + root.homeType, y)
           }
         }
+
+        // Sign-in offer for the reads the native streaming token cannot do
+        // (listening history, top rankings). One-time; the token renews
+        // itself from the stored refresh token afterwards.
+        Column {
+          visible: root.service && !root.service.homeLoading
+            && !root.service.webLoggedIn
+            && root.service.homeItems(root.homeType).length === 0
+          anchors.horizontalCenter: parent.horizontalCenter
+          y: parent.height * 0.42
+          spacing: Style.space(8)
+
+          Button {
+            visible: root.service && root.service.homeLoginAvailable
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: root.service && root.service.webLoginBusy
+              ? "Signing in…" : "Log in with Spotify"
+            iconText: root.service && root.service.webLoginBusy ? "󰤂" : "󰋑"
+            foreground: root.foreground
+            enabled: root.service && !root.service.webLoginBusy
+            onClicked: if (root.service) root.service.loginForHome()
+          }
+
+          Text {
+            width: Math.min(Style.space(420), root.service ? parent.width : 0)
+            anchors.horizontalCenter: parent.horizontalCenter
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
+            visible: root.service
+              && (root.service.webLoginBusy || root.service.homeLoginHint !== "")
+            text: root.service && root.service.webLoginBusy
+              ? root.service.homeLoginHint
+              : (root.service ? root.service.homeLoginHint : "")
+            color: root.muted
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+        }
       }
     }
   }
@@ -6666,6 +6705,38 @@ Item {
                   }
                   onEditingFinished: root.persistDraftSettings()
                 }
+              }
+            }
+
+            Column {
+              width: parent.width
+              spacing: Style.space(4)
+
+              Text {
+                text: "SPOTIFY APP CLIENT ID · FOR YOU SIGN-IN"
+                color: root.muted
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.bold: true
+              }
+              TextField {
+                width: parent.width
+                foreground: root.foreground
+                placeholderText: "32 hexadecimal characters"
+                text: root.draftClientId
+                onTextEdited: {
+                  root.draftClientId = String(text).trim().toLowerCase()
+                  root.persistDraftSettings()
+                }
+                onEditingFinished: root.persistDraftSettings()
+              }
+              Text {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: "The client ID of your Spotify app from developer.spotify.com. Spoty uses it only to sign in for listening history and top rankings; the token stays on this machine. Everything else runs without it."
+                color: root.muted
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
               }
             }
 

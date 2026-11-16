@@ -482,9 +482,24 @@ Item {
   property var topTracks: []
   property var topArtists: []
   property bool homeLoaded: false
-  readonly property string homeUnavailableReason: "Account listening history and top rankings are not supported by this version of the player yet."
+  readonly property string homeUnavailableReason: "Sign in with Spotify below to see your listening history and top rankings."
   property int homeRequestsPending: 0
   readonly property bool homeLoading: homeRequestsPending > 0
+  // For You reads need the panel's own full-scope OAuth session.
+  readonly property bool webLoggedIn: webAuthManager.loggedIn
+  readonly property bool webLoginBusy: webAuthManager.loginBusy
+    || webAuthManager.sessionBusy
+  readonly property bool homeLoginAvailable: webAuthManager.validClientId
+  readonly property string homeLoginHint: !webAuthManager.validClientId
+    ? "Add your Spotify app client ID in Settings to sign in."
+    : (webAuthManager.loginBusy
+      ? (webAuthManager.callbackHandled ? "Finishing sign-in…" : "Opening Spotify sign-in…")
+      : (webAuthManager.lastError || ""))
+  function loginForHome() {
+    noteActivity()
+    if (!webAuthManager.validClientId) return
+    webAuthManager.beginLogin()
+  }
 
   property var discoverPlaylists: []
   property var discoverCandidates: []
@@ -2672,14 +2687,16 @@ Item {
   function loadHome() {
     // The omarchy-spotify backend answers 501 for the history and
     // top-ranking endpoints under native sign-in (its streaming token
-    // cannot read them), so keep the page gracefully empty instead of
-    // surfacing an error. A full-scope panel login could lift this later.
-    if (spotifyApi.nativeSession) {
+    // cannot read them). Spoty reads them with the panel's own full-scope
+    // OAuth session instead; without it the page stays gracefully empty
+    // and offers the sign-in.
+    if (!webAuthManager.loggedIn) {
       homeRequestsPending = 0
       homeLoaded = true
       return
     }
     if (homeLoading) return
+    var homeOptions = { useAuth: true }
     var expected = dataSerial
     homeLoaded = false
     homeRequestsPending = 3
@@ -2693,7 +2710,7 @@ Item {
           root.recentTracks = page.items
         }
         root.finishHomeRequest(error)
-      })
+      }, homeOptions)
     spotifyApi.request("GET", "/me/top/tracks", {
       limit: 30, time_range: "medium_term"
     }, null, function(status, payload, error) {
@@ -2705,7 +2722,7 @@ Item {
           root.topTracks = page.items
       }
       root.finishHomeRequest(error)
-    })
+    }, homeOptions)
     spotifyApi.request("GET", "/me/top/artists", {
       limit: 30, time_range: "medium_term"
     }, null, function(status, payload, error) {
@@ -2717,7 +2734,7 @@ Item {
           root.topArtists = page.items
       }
       root.finishHomeRequest(error)
-    })
+    }, homeOptions)
   }
 
   function homeItems(kind) {
@@ -4223,6 +4240,18 @@ Item {
   }
 
   Connections {
+    target: webAuthManager
+    function onLoginSucceeded() {
+      root.lastError = ""
+      root.homeLoaded = false
+      if (root.currentTab === "home") root.loadHome()
+    }
+    function onLoggedOut() {
+      root.homeLoaded = false
+    }
+  }
+
+  Connections {
     target: daemonManager
     function onCredentialsAvailableChanged() {
       if (daemonManager.credentialsAvailable && root.uiVisible)
@@ -4605,6 +4634,17 @@ Item {
     id: spotifyApi
     auth: authManager
     nativeSession: authManager
+    webAuth: webAuthManager
+  }
+
+  // Full-scope OAuth session for the reads the native streaming token
+  // cannot do (listening history, top rankings). Its refresh token lives in
+  // the same on-disk store; login is one-time and renews itself.
+  AuthManager {
+    id: webAuthManager
+    pluginDir: root.pluginDir
+    clientId: String(root.settings.clientId || "")
+    settingsReady: root.settingsReady
   }
 
   SpotifyConnectManager {
