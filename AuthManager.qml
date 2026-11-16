@@ -166,15 +166,17 @@ Item {
     startSecretLookup()
   }
 
+  readonly property string tokenStoreDir: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/spoty"
+  function tokenStorePath(clientId) {
+    var id = String(clientId || resolvedClientId || "").replace(/[^0-9a-f]/gi, "")
+    return tokenStoreDir + "/refresh-token-" + (id || "default")
+  }
+
   function startSecretLookup() {
     lookupHandled = false
     keyringTimeout.restart()
-    secretLookup.command = [
-      "secret-tool", "lookup",
-      "service", "quickshell-spotify",
-      "kind", "refresh-token",
-      "client-id", String(resolvedClientId)
-    ]
+    var path = tokenStorePath(resolvedClientId)
+    secretLookup.command = ["/usr/bin/sh", "-c", "mkdir -p \"$1\" && cat \"$2\" 2>/dev/null || true", "sh", tokenStoreDir, path]
     secretLookup.identity = resolvedClientId
     secretLookup.running = true
   }
@@ -249,19 +251,16 @@ Item {
   function storeRefreshToken(refreshToken) {
     if (!refreshToken || keyringStore.running) return
     keyringWriteToken = String(refreshToken)
-    keyringStore.command = [pluginDir + "/scripts/keyring-store.sh", String(resolvedClientId)]
+    var path = tokenStorePath(resolvedClientId)
+    keyringStore.command = ["/usr/bin/sh", "-c", "umask 077 && mkdir -p \"$1\" && cat > \"$2\"", "sh", tokenStoreDir, path]
     keyringStore.identity = resolvedClientId
     keyringStore.running = true
   }
 
   function clearStoredToken(identity) {
     if (keyringClear.running) return
-    keyringClear.command = [
-      "secret-tool", "clear",
-      "service", "quickshell-spotify",
-      "kind", "refresh-token",
-      "client-id", String(identity || resolvedClientId)
-    ]
+    var path = tokenStorePath(identity || resolvedClientId)
+    keyringClear.command = ["/usr/bin/sh", "-c", "rm -f \"$1\"", "sh", path]
     keyringClear.running = true
   }
 
@@ -414,7 +413,7 @@ Item {
     onTriggered: {
       root.lookupHandled = true
       secretLookup.running = false
-      root.lastError = "The secure keyring did not respond. Unlock it, then try again."
+      root.lastError = "Could not read saved Spotify session. Try signing in again."
       root.sessionChecked = true
       root.finishWaiters("", root.lastError)
       root.sessionUnavailable(root.lastError)
@@ -504,7 +503,7 @@ Item {
     onExited: function(exitCode) {
       root.keyringWriteToken = ""
       if (exitCode !== 0 && identity === root.resolvedClientId && !root.switchingIdentity)
-        root.lastError = "Spotify connected, but the session could not be saved securely. You may need to sign in again after restarting"
+        root.lastError = "Spotify connected, but the session could not be saved. You may need to sign in again after restarting"
       if (root.logoutPendingClear) {
         root.logoutPendingClear = false
         root.clearStoredToken(identity)

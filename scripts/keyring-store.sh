@@ -1,18 +1,12 @@
 #!/bin/sh
 set -eu
-
 client_id=${1:-}
-if [ -z "$client_id" ]; then
-  exit 2
-fi
-
+[ -n "$client_id" ] || exit 2
 IFS= read -r refresh_token
-if [ -z "$refresh_token" ]; then
-  exit 3
-fi
-
-printf '%s' "$refresh_token" | secret-tool store \
-  --label='Omarchy Spotify refresh token' \
-  service quickshell-spotify \
-  kind refresh-token \
-  client-id "$client_id"
+[ -n "$refresh_token" ] || exit 3
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/spoty"
+id=$(printf '%s' "$client_id" | tr -cd '0-9A-Fa-f')
+[ -n "$id" ] || id=default
+umask 077
+mkdir -p "$state_dir"
+printf '%s' "$refresh_token" > "$state_dir/refresh-token-$id"
