@@ -514,7 +514,9 @@ Item {
       ? service.playlistRememberedItemCount : restoredPlaylistItemCount
     service.persistSession({
       tab: currentTab === "login" ? "home" : currentTab,
-      searchText: searchText,
+      // The search query is transient: it never survives the tab, the
+      // panel, or the session, so reopening lands on recent searches.
+      searchText: "",
       searchType: searchType,
       libraryType: libraryType,
       homeType: homeType,
@@ -1934,6 +1936,9 @@ Item {
     if (service) {
       service.setUiVisible("full-panel", false)
       service.cancelSearch(false)
+      // The query does not outlive the panel: reopening lands on the
+      // recent-searches view.
+      service.clearSearch()
     }
     closingFromHost = false
   }
@@ -1957,16 +1962,29 @@ Item {
     return true
   }
 
+  // Clear the Search tab back to its resting state: empty query box,
+  // recent-searches view. The recent-search history itself is kept.
+  function clearSearchView() {
+    unifiedSearchDelay.stop()
+    searchText = ""
+    if (service) service.clearSearch()
+    syncUnifiedSearchField()
+  }
+
   function chooseTab(tab) {
     if (!accountConnected) {
       currentTab = "login"
       openedForLogin = true
       return
     }
-    var enteringSearch = currentTab !== "search" && tab === "search"
+    // Search results are transient: leaving the Search tab clears the
+    // query so the page returns to its recent-searches resting state.
+    // The recent-search history itself is kept.
+    var leavingSearch = currentTab === "search" && tab !== "search"
     disarmEscapeClose()
     unifiedSearchDelay.stop()
     if (showingUniversalSearch && tab !== "search" && service) service.cancelSearch(false)
+    if (leavingSearch) clearSearchView()
     searchInContext = true
     universalSearchActive = false
     rememberCurrentContentTab()
@@ -1976,6 +1994,7 @@ Item {
     if (service) {
       service.openView(tab, false)
       if (tab === "playlists") restorePlaylistSelection()
+      var enteringSearch = tab === "search" && !leavingSearch
       if (enteringSearch && Api.searchNeedsLoad(searchText,
           service.searchResultQuery, service.searchLoadedTypes[searchType]))
         service.search(searchText, searchType)
@@ -2241,6 +2260,7 @@ Item {
       persistUiState()
       service.setUiVisible("full-panel", false)
       service.cancelSearch(false)
+      service.clearSearch()
     }
   }
 
