@@ -654,8 +654,11 @@ BarWidget {
           anchors.centerIn: parent
           readonly property real glyphCenter: button.contentLeftMargin
             + barGlyph.width / 2
-          width: Math.min(button.width * 0.5 / 0.55, glyphCenter * 2,
-            Style.bar.iconSlot * 1.2)
+          // Fixed size: tied to the icon slot only, never to the widget's
+          // width, so the mark does not grow and shrink as the title/artist
+          // text comes and goes. The glyphCenter cap keeps it from spilling
+          // past the widget's left edge while the icon hugs it.
+          width: Math.min(Style.bar.iconSlot * 0.5 / 0.55, glyphCenter * 2)
           height: button.height
           visible: false
         }
