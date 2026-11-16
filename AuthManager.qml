@@ -252,7 +252,15 @@ Item {
     if (!refreshToken || keyringStore.running) return
     keyringWriteToken = String(refreshToken)
     var path = tokenStorePath(resolvedClientId)
-    keyringStore.command = ["/usr/bin/sh", "-c", "umask 077 && mkdir -p \"$1\" && cat > \"$2\"", "sh", tokenStoreDir, path]
+    // Atomic write: the token lands in a temp file that is renamed over
+    // the target only once fully written. A truncated in-place write
+    // would let a mid-write shutdown destroy the only copy of the token
+    // and turn the one-time sign-in into a recurring one.
+    keyringStore.command = ["/usr/bin/sh", "-c",
+      "umask 077 && mkdir -p \"$1\" && rm -f \"$1\"/.refresh-token.tmp.*"
+      + " && cat > \"$1/.refresh-token.tmp.$$\""
+      + " && mv \"$1/.refresh-token.tmp.$$\" \"$2\"",
+      "sh", tokenStoreDir, path]
     keyringStore.identity = resolvedClientId
     keyringStore.running = true
   }
