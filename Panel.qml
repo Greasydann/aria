@@ -6007,15 +6007,9 @@ Item {
             onClicked: root.service.stopEngine()
           }
 
-          Button {
-            text: "Start this computer"
-            iconText: "󰓃"
-            foreground: root.foreground
-            visible: root.service && root.service.fullyConnected
-              && !root.service.daemon.running
-            enabled: root.service && !root.service.daemon.busy
-            onClicked: if (root.service) root.service.startEngine()
-          }
+          // No "Start this computer" button: Spoty's playback target is the
+          // Soloist receiver alone, and starting the embedded engine here
+          // would fight it.
 
           Text {
             width: parent.width
