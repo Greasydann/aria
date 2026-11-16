@@ -94,6 +94,22 @@ Item {
     return null
   }
 
+  // Soloist as the playback target, even between device-list refreshes: the
+  // Soloist Connect device can blink out of /me/player/devices while it
+  // keeps playing, so also accept the Soloist fallback's synthetic receiver
+  // (and any remote receiver Soloist reports). Control commands must route
+  // locally in that state instead of falling through to the remote API,
+  // whose stale device id only produces 404s.
+  function soloistTarget() {
+    var listed = soloistDevice()
+    if (listed) return listed
+    if (useRemotePlayback && remoteDevice
+        && isSoloistName(remoteDevice.sourceName || remoteDevice.name)) {
+      return remoteDevice
+    }
+    return null
+  }
+
   function officialSpotifyMprisPlayer() {
     for (var i = 0; i < mprisPlayers.length; i++) {
       if (isOfficialSpotifyPlayer(mprisPlayers[i])) return mprisPlayers[i]
@@ -3232,12 +3248,12 @@ Item {
 
   function dispatchPendingPlayback(playbackSerial) {
     if (playbackSerial !== pendingPlaybackSerial || !pendingPlaybackBody) return
-    var soloist = soloistDevice()
     var target = autoselectLocalDevice() || chooseDevice()
 
     // Spoty: Soloist is the single local playback target. The official
     // Spotify desktop app is never launched or targeted for audio.
-    if (soloist && soloist.id) {
+    var soloist = soloistTarget()
+    if (soloist && soloist.id && String(soloist.id) !== "soloist:spoty") {
       localActivationRequested = false
       sendPendingPlayback(soloist.id)
       return
@@ -3639,11 +3655,11 @@ Item {
     }
     var nextState = playing ? "pause" : "play"
     showMediaOsd(nextState)
-    if (soloistDevice() || !hasLocalPlayer) {
+    if (soloistTarget()) {
       var bin = "/home/dann/.local/bin/soloist"
       Quickshell.execDetached(["sh", "-c",
         bin + " ctl now 2>&1 | grep -q '\\bplaying\\b' && " + bin + " ctl pause || " + bin + " ctl play"])
-      if (soloistDevice()) return
+      return
     }
     if (!useRemotePlayback && hasLocalPlayer && activePlayer.canTogglePlaying) {
       activePlayer.togglePlaying()
@@ -3662,7 +3678,7 @@ Item {
     noteActivity()
     if (sendSonosControl("next", "")) { showMediaOsd("next"); return }
     showMediaOsd("next")
-    if (soloistDevice() || !hasLocalPlayer) { soloistCtl(["next"]); if (soloistDevice()) return }
+    if (soloistTarget()) { soloistCtl(["next"]); return }
     if (!useRemotePlayback && hasLocalPlayer && activePlayer.canGoNext) activePlayer.next()
     else remotePlayerAction("POST", "/me/player/next", controlQuery())
   }
@@ -3671,7 +3687,7 @@ Item {
     noteActivity()
     if (sendSonosControl("previous", "")) { showMediaOsd("previous"); return }
     showMediaOsd("previous")
-    if (soloistDevice() || !hasLocalPlayer) { soloistCtl(["prev"]); if (soloistDevice()) return }
+    if (soloistTarget()) { soloistCtl(["prev"]); return }
     if (!useRemotePlayback && hasLocalPlayer && activePlayer.canGoPrevious) activePlayer.previous()
     else remotePlayerAction("POST", "/me/player/previous", controlQuery())
   }
