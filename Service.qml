@@ -2670,11 +2670,10 @@ Item {
   }
 
   function loadHome() {
-    if (spotifyApi.nativeSession) {
-      homeRequestsPending = 0
-      homeLoaded = true
-      return
-    }
+    // The native login session proxies real Web API requests (search,
+    // library, playlists and playback state all run through it), so the
+    // history and top-ranking endpoints work the same way — the old
+    // embedded-engine gate does not apply to Spoty.
     if (homeLoading) return
     var expected = dataSerial
     homeLoaded = false
