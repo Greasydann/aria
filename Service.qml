@@ -498,6 +498,7 @@ Item {
   readonly property double searchCooldownUntil: spotifyApi.rateLimitedUntil
   function searchProgressText(timestamp) { return searchController.progressText(timestamp) }
   property string lastError: ""
+  property double lastErrorAt: 0
   property string statusMessage: ""
 
   readonly property bool playlistRestorePending: Api.playlistRestorePending(
@@ -829,6 +830,7 @@ Item {
   function fail(reason) {
     statusClearTimer.stop()
     lastError = safeError(reason)
+    lastErrorAt = Date.now()
     statusMessage = ""
     operationFailed(lastError)
   }
@@ -1343,6 +1345,12 @@ Item {
     // Spoty uses Soloist as the playback target: prefer Soloist state for UI.
     remotePlayback = soloistPlayback
     playbackPositionTick++
+    // Playback is demonstrably healthy; drop stale transient errors (such as
+    // Spotify 404s from unavailable queue items) so they do not linger.
+    if (root.lastError !== "" && Date.now() - root.lastErrorAt > 8000) {
+      root.lastError = ""
+      root.statusMessage = ""
+    }
     return true
   }
 
@@ -2940,7 +2948,13 @@ Item {
       function(status, payload, error) {
         if (expected !== root.dataSerial) return
         root.queueLoading = false
-        if (error) root.fail(error)
+        // Spotify's queue endpoint fails as a whole when any queued item is
+        // unavailable (404). Show an empty queue instead of surfacing that as
+        // a persistent error; playback itself is unaffected.
+        if (error && status === 404) {
+          root.queue = []
+          root.queueLoaded = true
+        } else if (error) root.fail(error)
         else {
           var source = payload && Array.isArray(payload.queue) ? payload.queue : []
           var next = []
