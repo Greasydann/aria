@@ -4521,8 +4521,9 @@ Item {
   NativeSession {
     id: authManager
     pluginDir: root.pluginDir
-    // Spoty uses Soloist for local playback; avoid embedded backend session/socket churn.
-    enabled: false
+    // Spoty keeps the native login/browsing session, but playback audio is
+    // routed to Soloist; the embedded playback engine stays off.
+    enabled: daemonManager.playbackReady && !daemonManager.usingFallbackRuntime
   }
 
   SpotifyApi {
