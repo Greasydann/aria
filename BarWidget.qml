@@ -620,7 +620,7 @@ BarWidget {
     tooltipText: root.spotify && root.spotify.hasMedia
       ? root.spotify.title + (root.spotify.artist ? " — " + root.spotify.artist : "")
       : (root.spotify && !root.spotify.accountConnected
-        ? "Set up Omarchy Spotify" : "Omarchy Spotify")
+        ? "Set up Spotify" : "Aria")
     // The Spotify glyph's horizontal anchor: the exact center of the idle
     // icon slot (widget width is iconSlot when idle). Held constant in
     // every state, so the icon sits dead-center in the hover pill when

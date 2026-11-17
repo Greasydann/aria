@@ -59,7 +59,7 @@ Item {
   readonly property bool artworkVisible: !service || service.artworkEnabled
 
   property string draftClientId: ""
-  property string draftDeviceName: "Omarchy Spotify"
+  property string draftDeviceName: "Spoty"
   property string draftIdleMinutes: "15"
   property bool draftShowMiniPlayer: true
   property bool draftShowArtwork: true
@@ -319,7 +319,7 @@ Item {
   }
 
   function connectionErrorText() {
-    if (!service) return "Omarchy Spotify is unavailable"
+    if (!service) return "Aria is unavailable"
     return service.lastError || service.auth.lastError || service.daemon.lastError
   }
 
@@ -3089,7 +3089,7 @@ Item {
   FloatingWindow {
     id: window
     visible: root.opened
-    title: "Omarchy Spotify"
+    title: "Aria — Spotify"
     color: root.background
     implicitWidth: 980
     implicitHeight: 720
@@ -3472,7 +3472,7 @@ Item {
 
                 Text {
                   width: parent.width
-                  text: "Music"
+                  text: "Aria"
                   color: root.foreground
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.subtitle
@@ -6197,7 +6197,7 @@ Item {
             Text {
               width: parent.width
               horizontalAlignment: Text.AlignHCenter
-              text: "Omarchy Spotify"
+              text: "Aria"
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.title
@@ -6404,7 +6404,7 @@ Item {
           Text {
             width: parent.width
             horizontalAlignment: Text.AlignHCenter
-            text: "Your password is entered only on Spotify's own page. Omarchy Spotify never sees it."
+            text: "Your password is entered only on Spotify's own page. Aria never sees it."
             color: root.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption

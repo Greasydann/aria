@@ -1,8 +1,8 @@
-# Omarchy Spotify
+# Aria
 
 **Spotify in Quickshell—not Chromium.**
 
-Omarchy Spotify brings the Spotify experience you already know into a fast,
+Aria brings the Spotify experience you already know into a fast,
 beautiful Omarchy plugin. It uses about **60 MB of RAM** instead of roughly
 **950 MB** for the Spotify desktop client, follows your active Omarchy theme,
 and keeps your music close with an integrated mini player.

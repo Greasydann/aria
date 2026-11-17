@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "id": "spoty",
-  "name": "Spoty",
+  "name": "Aria",
   "version": "1.1.0",
   "author": "QuickshellSpotify",
   "license": "MIT",
-  "description": "Spoty: quickshell.spotify-style Spotify UI for Omarchy, with local playback via Soloist or the official Spotify client (no broken librespot backend).",
+  "description": "Aria: a Spotify player for Omarchy in the spirit of quickshell.spotify, with local playback via Soloist.",
   "kinds": [
     "service",
     "bar-widget",
@@ -18,8 +18,8 @@
     "panel": "Panel.qml"
   },
   "barWidget": {
-    "displayName": "Spoty",
-    "description": "Spoty bar/panel: browse and control Spotify with local playback routed to Soloist (preferred) or the official Spotify app.",
+    "displayName": "Aria",
+    "description": "Aria bar/panel: browse and control Spotify with playback routed to Soloist.",
     "category": "Media",
     "aliases": [
       "spotify",
