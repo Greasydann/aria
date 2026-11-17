@@ -831,8 +831,8 @@ BarWidget {
 
       Column {
         width: parent.width
+        visible: root.spotify && !root.spotify.accountConnected
         spacing: Style.space(8)
-          && root.spotify && !root.spotify.accountConnected
 
         Text {
           width: parent.width
