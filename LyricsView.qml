@@ -35,14 +35,24 @@ Item {
   }
   readonly property bool syncedView: status === "found" && lines.length > 0
 
-  onActiveIndexChanged: Qt.callLater(scrollToActive)
-  onVisibleChanged: if (visible) Qt.callLater(scrollToActive)
+  onActiveIndexChanged: Qt.callLater(centerOnActive)
+  onVisibleChanged: if (visible) Qt.callLater(centerOnActive)
 
-  // Minimal scroll: only moves when the active line is out of view, and
-  // always in the direction of the line (never up when the line is below).
-  function scrollToActive() {
+  // Keep the highlighted line at the vertical center of the view, like the
+  // desktop client's lyrics page. Skipped while the user is dragging so
+  // their own scrolling is never yanked back.
+  function centerOnActive() {
     if (!syncedView || activeIndex < 0) return
-    view.positionViewAtIndex(activeIndex, ListView.Contain)
+    if (view.moving || view.flicking) return
+    var item = view.itemAtIndex(activeIndex)
+    if (!item) {
+      view.positionViewAtIndex(activeIndex, ListView.Contain)
+      item = view.itemAtIndex(activeIndex)
+      if (!item) return
+    }
+    var y = item.mapToItem(view.contentItem).y
+    view.contentY = Math.max(0, Math.min(view.contentHeight - view.height,
+      y + item.height / 2 - view.height / 2))
   }
 
   Column {
