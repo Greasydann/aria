@@ -641,7 +641,16 @@ BarWidget {
         readonly property bool scrolling: root.spotify && root.spotify.scrollBarText
           && barLabel.needsScroll && root.spotify.hasMedia && root.spotify.playing
           && !root.popupOpen && !root.vertical
-        // Use a wide enough ramp to read as a deliberate fade at bar scale.
+        onScrollingChanged: {
+          // Re-entering the marquee starts from the right edge; stopping
+          // shows the track name from its beginning.
+          barLabel.x = scrolling ? scrollClip.width : 0
+        }
+        // Marquee pace in px per second, from the scroll-speed setting
+        // (1 = 40 px/s). Driven by a timer below: property animators on the
+        // render thread were observed to stall mid-scroll.
+        readonly property real marqueeSpeed: 40
+          * Math.max(0.25, root.spotify ? root.spotify.scrollSpeed : 1)
         readonly property real fadeStop: width > 0
           ? Math.min(0.2, Style.space(28) / width) : 0
 
@@ -669,30 +678,19 @@ BarWidget {
 
             readonly property bool needsScroll: implicitWidth > scrollClip.width
 
-            // Keep the marquee on the render thread so it remains smooth
-            // without dispatching JavaScript timer callbacks through the
-            // shared shell's main thread.
-            XAnimator on x {
-              id: barScrollAnimation
+            // Timer-driven marquee: a render-thread XAnimator was observed
+            // to stall mid-scroll, so the position is advanced on the main
+            // thread instead — deterministic and immune to animator races.
+            Timer {
+              id: marqueeTimer
+              interval: 33
               running: scrollClip.scrolling
-              loops: Animation.Infinite
-              // Constant pace over the whole loop: enter from the right,
-              // scroll the label fully out to the left. The label width
-              // must be referenced through its id — an unqualified
-              // implicitWidth resolves to the widget's own (the root
-              // button), which made short titles crawl at the duration
-              // floor and long titles restart before fully exiting. The
-              // pace follows the scroll-speed setting: 1 = 40 px/s.
-              duration: Math.max(1500, Math.round(
-                (scrollClip.width + barLabel.implicitWidth) * 25
-                / Math.max(0.25, root.spotify ? root.spotify.scrollSpeed : 1)))
-              from: scrollClip.width
-              to: -barLabel.implicitWidth
-              easing.type: Easing.Linear
-              // A changed duration only takes effect on the next start,
-              // so re-apply it live (speed setting edits mid-scroll).
-              onDurationChanged: if (running) barScrollAnimation.restart()
-              onStopped: barLabel.x = 0
+              repeat: true
+              onTriggered: {
+                barLabel.x -= scrollClip.marqueeSpeed * interval / 1000
+                if (barLabel.x <= -barLabel.implicitWidth)
+                  barLabel.x = scrollClip.width
+              }
             }
           }
         }
