@@ -24,11 +24,15 @@ qml_test_runner=/usr/lib/qt6/bin/qmltestrunner
 }
 
 omarchy plugin validate .
-qmllint -I /usr/share/omarchy/shell Api.js OAuth.js AuthManager.qml \
+# Lint each file separately: a single qmllint invocation over the whole
+# list can abort on large multi-file inputs, which would mask real issues.
+for qml_file in Api.js OAuth.js AuthManager.qml \
   NativeSession.qml SpotifyApi.qml SearchController.qml FilterScanController.qml SpotifyConnectManager.qml Service.qml \
   BarWidget.qml PlaybackSlider.qml ArtistLinks.qml MediaByline.qml MediaRow.qml MediaCollection.qml \
-  ArtistSearchSection.qml LyricsInstallPrompt.qml RetryImage.qml ShortcutHint.qml \
-  TransportButton.qml Panel.qml
+  ArtistSearchSection.qml LyricsView.qml RetryImage.qml ShortcutHint.qml \
+  TransportButton.qml Panel.qml; do
+  qmllint -I /usr/share/omarchy/shell "$qml_file"
+done
 
 QT_QPA_PLATFORM=offscreen "$qml_test_runner" \
   -input tests \

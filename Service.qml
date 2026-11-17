@@ -250,26 +250,16 @@ Item {
   readonly property var currentLyricsSong: Api.lyricsSong(currentTrackId,
     title, artist, album, lengthSeconds, artUrl, positionSeconds)
   readonly property bool lyricsAvailable: showLyrics && currentLyricsSong !== null
-  readonly property string lyricsPluginId: "stappmus.lyrics"
-  readonly property string lyricsPluginUrl: "https://github.com/stappmus/Omasing.git"
-  property string lyricsHostState: ""
-  readonly property string lyricsPluginAvailability: {
-    if (lyricsHostState) return lyricsHostState
-    var plugins = pluginRegistry && pluginRegistry.installedPlugins
-      ? pluginRegistry.installedPlugins : ({})
-    return Api.optionalPluginState(!!plugins[lyricsPluginId], !!plugins[lyricsPluginId]
-      && typeof pluginRegistry.inBar === "function" && pluginRegistry.inBar(lyricsPluginId))
-  }
-  function refreshLyricsHostState() {
-    if (!lyricsHostCheck.running) lyricsHostCheck.running = true
-  }
-  property bool lyricsPluginBusy: false
-  property string lyricsPluginOperation: ""
-  property string lyricsPluginError: ""
-  property string lyricsPluginRequestSurface: ""
-  property var pendingLyricsSong: null
-  property int lyricsPluginLaunchAttempts: 0
-  property double lyricsPluginInstallStartedAt: 0
+  // Built-in lyrics: fetched once per track from lrclib.net and cached in
+  // memory for the session.
+  property var lyricsCache: ({})
+  property var activeLyrics: null
+  property string lyricsStatus: "" // "", "loading", "found", "plain", "instrumental", "notfound", "error"
+  property string lyricsError: ""
+  property string lyricsLoadedTrackId: ""
+  property var lyricsRequest: null
+  property int lyricsRequestSerial: 0
+  property var xhrFactory: function() { return new XMLHttpRequest() }
   readonly property var currentAlbumItem: remoteTrack
     && (useRemotePlayback || (currentTrackId !== ""
       && String(remoteTrack.id || "") === currentTrackId))
@@ -602,8 +592,6 @@ Item {
 
   signal operationFailed(string reason)
   signal radioPlaylistReady(var playlist)
-  signal lyricsPluginPromptRequested(string surface, string availability)
-  signal lyricsPluginOpened(string surface)
 
   function loginProgressText() {
     if (authManager.loginBusy) return authManager.pairingCode
@@ -736,7 +724,6 @@ Item {
     }
     sessionFileReady = true
     reconcileSessionPersistence()
-    resumeLyricsInstallIntent()
   }
 
   function scheduleSessionSave() {
@@ -803,7 +790,6 @@ Item {
       settingsReady = true
     }
     reconcileSessionPersistence()
-    resumeLyricsInstallIntent()
   }
 
   function isEmbeddedOmarchyBackendPlayer(player) {
@@ -889,178 +875,95 @@ Item {
     else statusClearTimer.stop()
   }
 
-  function requestLyrics(surface) {
-    if (!currentLyricsSong) return "unavailable"
-    lyricsPluginRequestSurface = String(surface || "")
-    pendingLyricsSong = currentLyricsSong
-    lyricsPluginError = ""
-    lyricsPluginLaunchAttempts = 0
-    if (lyricsPluginAvailability === "ready") {
-      launchLyricsPlugin()
-      return "opening"
-    }
-    lyricsPluginPromptRequested(lyricsPluginRequestSurface,
-      lyricsPluginAvailability)
-    return lyricsPluginAvailability
+  function lyricsStatusFor(record) {
+    if (!record) return "notfound"
+    if (record.instrumental) return "instrumental"
+    if (record.lines && record.lines.length) return "found"
+    if (record.plain) return "plain"
+    return "notfound"
   }
 
-  function pendingLyricsInstall() {
-    var pending = sessionState && sessionState.pendingLyricsInstall
-    return pending && typeof pending === "object" ? pending : null
+  function adoptLyrics(record, status) {
+    activeLyrics = record
+    lyricsStatus = status
   }
 
-  function persistLyricsInstallIntent() {
-    if (!pendingLyricsSong) return
-    var state = Api.shallowCopy(sessionState)
-    state.pendingLyricsInstall = Api.lyricsInstallIntent(pendingLyricsSong,
-      lyricsPluginRequestSurface, Date.now())
-    persistSession(state)
-  }
-
-  function clearLyricsInstallIntent() {
-    if (!pendingLyricsInstall()) return
-    persistSession(Api.sessionWithoutLyricsInstall(sessionState))
-  }
-
-  function confirmLyricsPlugin(surface) {
-    if (lyricsPluginBusy) return false
-    if (surface) lyricsPluginRequestSurface = String(surface)
-    if (!pendingLyricsSong) pendingLyricsSong = currentLyricsSong
-    if (!pendingLyricsSong) {
-      lyricsPluginError = "Play a song first, then try lyrics again."
-      return false
-    }
-    lyricsPluginError = ""
-
-    if (lyricsPluginAvailability === "ready") {
-      lyricsPluginLaunchAttempts = 0
-      launchLyricsPlugin()
-      return true
-    }
-
-    var command = Api.optionalPluginSetupCommand(lyricsPluginAvailability,
-      lyricsPluginId, lyricsPluginUrl)
-    if (!command.length) {
-      lyricsPluginError = "Omasing could not be prepared for installation."
-      return false
-    }
-    lyricsPluginOperation = lyricsPluginAvailability
-    lyricsPluginBusy = true
-    persistLyricsInstallIntent()
-
-    // Adding a plugin writes into ~/.config/omarchy/plugins, which reloads
-    // the shell and would kill a child Process before enable finishes.
-    // Detach the add and resume from the saved intent after reload.
-    if (lyricsPluginAvailability === "missing") {
-      lyricsPluginInstallStartedAt = Date.now()
-      Quickshell.execDetached(command)
-      lyricsPluginInstallPoll.restart()
-      return true
-    }
-
-    lyricsPluginSetupProcess.command = command
-    lyricsPluginSetupProcess.running = true
-    return true
-  }
-
-  function resumeLyricsInstallIntent() {
-    var intent = pendingLyricsInstall()
-    if (!intent) return
-    if (!Api.lyricsInstallIntentIsFresh(intent, Date.now(), 180000)) {
-      clearLyricsInstallIntent()
+  function fetchLyrics(force) {
+    var song = currentLyricsSong
+    if (!song) {
+      activeLyrics = null
+      lyricsStatus = ""
+      lyricsLoadedTrackId = ""
       return
     }
-    if (!pendingLyricsSong) pendingLyricsSong = intent.song
-    if (!lyricsPluginRequestSurface)
-      lyricsPluginRequestSurface = String(intent.surface || "")
-
-    if (lyricsPluginAvailability === "ready") {
-      lyricsPluginInstallPoll.stop()
-      lyricsPluginBusy = false
-      lyricsPluginError = ""
-      lyricsPluginLaunchAttempts = 0
-      clearLyricsInstallIntent()
-      launchLyricsPlugin()
+    var trackId = String(currentTrackId)
+    if (!force && lyricsLoadedTrackId === trackId) return
+    var cached = lyricsCache[trackId]
+    if (cached && !force) {
+      lyricsLoadedTrackId = trackId
+      adoptLyrics(cached, lyricsStatusFor(cached))
       return
     }
-
-    if (lyricsPluginBusy || lyricsPluginSetupProcess.running
-        || lyricsPluginInstallPoll.running)
-      return
-
-    if (lyricsPluginAvailability === "disabled") {
-      confirmLyricsPlugin(lyricsPluginRequestSurface)
-      return
-    }
-
-    lyricsPluginBusy = true
-    lyricsPluginOperation = "missing"
-    lyricsPluginInstallStartedAt = Number(intent.startedAt) || Date.now()
-    lyricsPluginInstallPoll.restart()
+    lyricsLoadedTrackId = trackId
+    var serial = ++lyricsRequestSerial
+    activeLyrics = null
+    lyricsStatus = "loading"
+    lyricsError = ""
+    lyricsLookupRequest(song, trackId, serial, true)
   }
 
-  function finishLyricsPluginInstallWatch() {
-    refreshLyricsHostState()
-    if (lyricsPluginAvailability === "ready") {
-      lyricsPluginBusy = false
-      lyricsPluginError = ""
-      lyricsPluginLaunchAttempts = 0
-      clearLyricsInstallIntent()
-      launchLyricsPlugin()
-      return true
+  function lyricsLookupRequest(song, trackId, serial, exact) {
+    var request = xhrFactory()
+    lyricsRequest = request
+    request.open("GET", exact ? Api.lyricsLookupUrl(song) : Api.lyricsSearchUrl(song))
+    request.setRequestHeader("User-Agent", "Aria/1.0 (Omarchy plugin)")
+    request.onreadystatechange = function() {
+      if (request.readyState !== XMLHttpRequest.DONE) return
+      if (serial !== root.lyricsRequestSerial) return
+      if (lyricsRequest === request) lyricsRequest = null
+      var status = request.status
+      var payload = Api.parseJson(request.responseText, null)
+      if (status === 200) {
+        var record = Api.normalizeLrcLibResult(exact
+          ? payload : Api.pickLrcLibResult(payload, song),
+          trackId, song.duration)
+        if (record) {
+          lyricsCache[trackId] = record
+          if (lyricsLoadedTrackId === trackId)
+            adoptLyrics(record, lyricsStatusFor(record))
+          return
+        }
+        if (exact) { lyricsLookupRequest(song, trackId, serial, false); return }
+        if (lyricsLoadedTrackId === trackId) {
+          activeLyrics = null
+          lyricsStatus = "notfound"
+        }
+        return
+      }
+      if (status === 404) {
+        if (exact) { lyricsLookupRequest(song, trackId, serial, false); return }
+        if (lyricsLoadedTrackId === trackId) {
+          activeLyrics = null
+          lyricsStatus = "notfound"
+        }
+        return
+      }
+      if (lyricsLoadedTrackId === trackId) {
+        lyricsStatus = "error"
+        lyricsError = "Could not load lyrics. Check the network and try again."
+      }
     }
-    if (lyricsPluginAvailability === "disabled") {
-      lyricsPluginBusy = false
-      confirmLyricsPlugin(lyricsPluginRequestSurface)
-      return true
-    }
-    if (Date.now() - lyricsPluginInstallStartedAt < 90000) return false
-    lyricsPluginBusy = false
-    lyricsPluginError = "Omasing could not be installed. Check your network and try again."
-    clearLyricsInstallIntent()
-    lyricsPluginPromptRequested(lyricsPluginRequestSurface,
-      lyricsPluginAvailability)
-    return true
+    request.send()
   }
 
-  function cancelLyricsPlugin(surface) {
-    if (lyricsPluginBusy) return
-    if (surface && String(surface) !== lyricsPluginRequestSurface) return
-    lyricsPluginInstallPoll.stop()
-    lyricsPluginRequestSurface = ""
-    pendingLyricsSong = null
-    lyricsPluginError = ""
-    clearLyricsInstallIntent()
+  function retryLyrics() {
+    var trackId = String(currentTrackId)
+    if (trackId) delete lyricsCache[trackId]
+    fetchLyrics(true)
   }
 
-  function launchLyricsPlugin() {
-    if (!pendingLyricsSong || lyricsPluginLaunchProcess.running) return
-    lyricsPluginLaunchAttempts++
-    lyricsPluginLaunchProcess.command = ["/usr/bin/omarchy-shell",
-      lyricsPluginId, "lyrics", JSON.stringify(pendingLyricsSong)]
-    lyricsPluginLaunchProcess.running = true
-  }
-
-  function finishLyricsPluginLaunch(exitCode) {
-    if (Number(exitCode) === 0) {
-      var openedSurface = lyricsPluginRequestSurface
-      pendingLyricsSong = null
-      lyricsPluginRequestSurface = ""
-      lyricsPluginError = ""
-      lyricsPluginLaunchAttempts = 0
-      lyricsPluginOpened(openedSurface)
-      return
-    }
-    if (lyricsPluginLaunchAttempts < 20) {
-      lyricsPluginLaunchRetry.restart()
-      return
-    }
-    var detail = String(lyricsPluginLaunchStderr.text || "").trim()
-    lyricsPluginError = safeError(detail
-      || "Omasing is installed, but its lyrics window could not be opened.")
-    lyricsPluginPromptRequested(lyricsPluginRequestSurface,
-      lyricsPluginAvailability)
-  }
+  // Keep the view in sync with what is playing.
+  onCurrentTrackIdChanged: fetchLyrics()
 
   function noteActivity() {
     lastActivityAt = Date.now()
@@ -3327,6 +3230,39 @@ Item {
     if (keepActivation !== true) localActivationRequested = false
   }
 
+  function probeForLocalDevice() {
+    if (!pendingPlayback && !localActivationRequested) return
+    loadDevices(function() {
+      if (!root.pendingPlayback && !root.localActivationRequested) return
+      var soloist = root.soloistDevice()
+      var soloistId = soloist ? root.playbackTargetId(soloist.id) : ""
+      if (soloistId) {
+        root.localActivationRequested = false
+        root.deviceProbeAttempts = 0
+        if (root.pendingPlayback)
+          root.sendPendingPlayback(soloistId)
+        return
+      }
+      var target = root.pendingPlayback
+        ? (root.autoselectLocalDevice() || root.chooseDevice()) : null
+      if (target && !target.local) {
+        root.localActivationRequested = false
+        root.sendPendingPlayback(Api.playbackTargetDeviceId(
+          target, root.selectedDeviceExplicit))
+        return
+      }
+      // Soloist-only: never fall back to the official app or the embedded
+      // omarchy-spotify backend device for audio.
+      root.deviceProbeAttempts++
+      if (root.deviceProbeAttempts < 20) {
+        deviceProbeTimer.restart()
+      } else {
+        root.clearPendingPlayback()
+        root.fail("Soloist (Aria) is not available as a playback device. Make sure it is running and logged in, then try again")
+      }
+    })
+  }
+
   function dispatchPendingPlayback(playbackSerial) {
     if (playbackSerial !== pendingPlaybackSerial || !pendingPlaybackBody) return
     var target = autoselectLocalDevice() || chooseDevice()
@@ -4017,11 +3953,9 @@ Item {
         && currentUri !== sleepTrackUri) finishSleepTimer()
   }
   onCurrentTrackItemUriChanged: syncCurrentTrackSaved(false)
-  onLyricsPluginAvailabilityChanged: resumeLyricsInstallIntent()
   onShellChanged: settingsSync.restart()
   onUiVisibleChanged: {
     if (uiVisible) {
-      refreshLyricsHostState()
       ensureVisibleLocalReceiver()
       syncCurrentTrackSaved(true)
       updateSleepCountdown()
@@ -4036,7 +3970,6 @@ Item {
   Component.onCompleted: {
     ensureStateDir.running = true
     settingsSync.start()
-    refreshLyricsHostState()
   }
 
   Connections {
@@ -4192,20 +4125,6 @@ Item {
     }
   }
 
-  Process {
-    id: lyricsHostCheck
-    command: ["timeout", "5", "omarchy", "plugin", "list", "--json"]
-    stdout: StdioCollector { waitForEnd: true }
-    stderr: StdioCollector { waitForEnd: true }
-    onExited: function(code) {
-      if (!root || code !== 0) return
-      var entries = Api.parseJson(stdout.text, null)
-      if (!Array.isArray(entries)) return
-      var match = entries.find(function(item) { return item.id === root.lyricsPluginId })
-      root.lyricsHostState = Api.optionalPluginState(!!match, !!match && match.enabled === true)
-    }
-  }
-
   Timer {
     interval: 15000
     repeat: true
@@ -4222,51 +4141,6 @@ Item {
       if (!root.sessionFileReady) sessionFile.reload()
       else if (root.sessionFileDirty) root.flushSessionFile()
     }
-  }
-
-  Timer {
-    id: lyricsPluginLaunchRetry
-    interval: 250
-    repeat: false
-    onTriggered: root.launchLyricsPlugin()
-  }
-
-  Timer {
-    id: lyricsPluginInstallPoll
-    interval: 400
-    repeat: true
-    onTriggered: if (root.finishLyricsPluginInstallWatch()) stop()
-  }
-
-  Process {
-    id: lyricsPluginSetupProcess
-    running: false
-    command: []
-    stdout: StdioCollector { id: lyricsPluginSetupStdout; waitForEnd: true }
-    stderr: StdioCollector { id: lyricsPluginSetupStderr; waitForEnd: true }
-    onExited: function(exitCode) {
-      root.lyricsPluginBusy = false
-      if (Number(exitCode) === 0) {
-        root.lyricsPluginOperation = ""
-        root.lyricsPluginError = ""
-        root.lyricsPluginLaunchAttempts = 0
-        lyricsPluginLaunchRetry.restart()
-        return
-      }
-      var detail = String(lyricsPluginSetupStderr.text
-        || lyricsPluginSetupStdout.text || "").trim()
-      root.lyricsPluginError = root.safeError(detail
-        || "Omasing could not be installed.")
-    }
-  }
-
-  Process {
-    id: lyricsPluginLaunchProcess
-    running: false
-    command: []
-    stdout: StdioCollector { waitForEnd: true }
-    stderr: StdioCollector { id: lyricsPluginLaunchStderr; waitForEnd: true }
-    onExited: function(exitCode) { root.finishLyricsPluginLaunch(exitCode) }
   }
 
   Timer {

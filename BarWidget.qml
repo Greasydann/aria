@@ -18,7 +18,6 @@ BarWidget {
   readonly property color foreground: bar ? bar.foreground : Theme.Color.foreground
   readonly property color muted: Theme.Color.muted
   readonly property string surfaceKey: "aria-popup-" + String(root)
-  readonly property string lyricsRequestKey: surfaceKey + "-lyrics"
   readonly property string barText: spotify
     ? Api.barTrackText(spotify.title, spotify.artist,
       spotify.showTrackTitle, spotify.showArtistName, spotify.playing,
@@ -61,7 +60,6 @@ BarWidget {
   }
   property bool popupOpen: false
   property bool contextMenuVisible: false
-  property bool lyricsInstallPromptVisible: false
   property bool miniShortcutHelpVisible: false
   property bool popoutSwitchClosing: false
   property bool miniCursorActive: false
@@ -75,7 +73,6 @@ BarWidget {
     : String(root.setting("shortcutHints", "On")) !== "Off"
   readonly property bool shortcutHintsActive: shortcutHintsEnabled
     && shortcutModeLatched && !miniShortcutHelpVisible
-    && !lyricsInstallPromptVisible
   readonly property bool shortcutHintsInPopup: shortcutHintsEnabled
     && shortcutModeLatched
   readonly property bool hintCtrlHeld: (heldModifierFlags & Qt.ControlModifier) !== 0
@@ -116,7 +113,6 @@ BarWidget {
   ]
   readonly property var miniKeyboardActions: {
     if (contextMenuVisible) return ["open"]
-    if (lyricsInstallPromptVisible) return ["prompt-cancel", "prompt-confirm"]
     if (miniShortcutHelpVisible) return ["help-close"]
     if (spotify && !spotify.accountConnected) {
       var setupActions = ["setup"]
@@ -338,22 +334,13 @@ BarWidget {
     })
   }
 
+  // Lyrics live in the full player: hand the song over and open it there.
   function openLyrics() {
     if (!spotify || !spotify.lyricsAvailable) return
-    var result = spotify.requestLyrics(lyricsRequestKey)
-    if (result !== "opening") {
-      lyricsInstallPromptVisible = true
-      popupOpen = true
-    }
-  }
-
-  function dismissLyricsInstallPrompt() {
-    if (spotify) spotify.cancelLyricsPlugin(lyricsRequestKey)
-    lyricsInstallPromptVisible = false
+    openFullPanel({ lyrics: true })
   }
 
   function toggleMiniShortcutHelp() {
-    if (lyricsInstallPromptVisible) return
     miniShortcutHelpVisible = !miniShortcutHelpVisible
     if (miniShortcutHelpVisible) setMiniCursor("help-close")
     else ensureMiniCursor()
@@ -427,11 +414,7 @@ BarWidget {
 
   function activateMiniAction(action) {
     if (action === "help-close") toggleMiniShortcutHelp()
-    else if (action === "prompt-cancel") dismissLyricsInstallPrompt()
-    else if (action === "prompt-confirm") {
-      if (spotify && !spotify.lyricsPluginBusy)
-        spotify.confirmLyricsPlugin(lyricsRequestKey)
-    } else if (action === "artist") openCurrentArtist()
+    else if (action === "artist") openCurrentArtist()
     else if (action === "album") openCurrentAlbum()
     else if (action === "like") {
       if (spotify) spotify.toggleCurrentTrackSaved()
@@ -467,24 +450,6 @@ BarWidget {
     var plain = !ctrl && !shift && !alt
     var text = String(event.text || "").toLowerCase()
 
-    if (lyricsInstallPromptVisible) {
-      if (event.key === Qt.Key_Escape) {
-        dismissLyricsInstallPrompt()
-      } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
-        moveMiniCursor(shift || event.key === Qt.Key_Backtab ? -1 : 1)
-      } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Up
-          || text === "h" || text === "k") {
-        moveMiniCursor(-1)
-      } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down
-          || text === "l" || text === "j") {
-        moveMiniCursor(1)
-      } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
-          || event.key === Qt.Key_Space) {
-        if (!event.isAutoRepeat) activateMiniAction(miniCursor)
-      } else return
-      root.acceptMiniKey(event)
-      return
-    }
 
     if (miniShortcutHelpVisible) {
       if (event.key === Qt.Key_Escape
@@ -565,12 +530,6 @@ BarWidget {
   onMiniPlayerEnabledChanged: if (!miniPlayerEnabled) close()
   onShortcutHintsEnabledChanged: if (!shortcutHintsEnabled) clearShortcutMode()
   onMiniKeyboardActionsChanged: ensureMiniCursor()
-  onLyricsInstallPromptVisibleChanged: {
-    if (lyricsInstallPromptVisible) {
-      miniCursor = "prompt-cancel"
-      miniCursorActive = true
-    } else ensureMiniCursor()
-  }
   onPopupOpenChanged: {
     if (popupOpen) {
       miniCursor = miniKeyboardActions.indexOf("play") >= 0
@@ -584,11 +543,6 @@ BarWidget {
       pendingShortcutLatch = false
     }
     if (spotify) spotify.setUiVisible(surfaceKey, popupOpen)
-    if (!popupOpen && lyricsInstallPromptVisible
-        && (!spotify || !spotify.lyricsPluginBusy)) {
-      if (spotify) spotify.cancelLyricsPlugin(lyricsRequestKey)
-      lyricsInstallPromptVisible = false
-    }
   }
   Component.onCompleted: {
     syncSettings()
@@ -824,7 +778,7 @@ BarWidget {
 
       Shortcut {
         sequence: "Ctrl+/"
-        enabled: root.popupOpen && !root.lyricsInstallPromptVisible
+        enabled: root.popupOpen
         onActivated: {
           root.latchShortcutMode("Ctrl+/")
           root.toggleMiniShortcutHelp()
@@ -878,7 +832,6 @@ BarWidget {
       Column {
         width: parent.width
         spacing: Style.space(8)
-        visible: !root.lyricsInstallPromptVisible
           && root.spotify && !root.spotify.accountConnected
 
         Text {
@@ -947,7 +900,6 @@ BarWidget {
         readonly property real metadataSpacing: Style.space(12)
         readonly property bool artworkVisible: !root.spotify
           || root.spotify.artworkEnabled
-        visible: !root.lyricsInstallPromptVisible
           && (!root.spotify || root.spotify.accountConnected)
 
         Item {
@@ -1224,7 +1176,6 @@ BarWidget {
       Column {
         width: parent.width
         spacing: Style.space(3)
-        visible: !root.lyricsInstallPromptVisible
           && (!root.spotify || root.spotify.accountConnected)
           && root.spotify && root.spotify.lengthSeconds > 0
 
@@ -1290,7 +1241,6 @@ BarWidget {
       Row {
         anchors.horizontalCenter: parent.horizontalCenter
         spacing: Style.space(5)
-        visible: !root.lyricsInstallPromptVisible
           && (!root.spotify || root.spotify.accountConnected)
 
         TransportButton {
@@ -1371,7 +1321,6 @@ BarWidget {
         id: miniVolumeCursor
         width: parent.width
         height: miniVolumeRow.implicitHeight + Style.space(2)
-        visible: !root.lyricsInstallPromptVisible
           && (!root.spotify || root.spotify.accountConnected)
           && root.spotify && root.spotify.hasPlayer
         hasCursor: root.miniCursorActive && root.miniCursor === "volume"
@@ -1423,13 +1372,11 @@ BarWidget {
 
       PanelSeparator {
         foreground: root.foreground
-        visible: !root.lyricsInstallPromptVisible
       }
 
       Row {
         width: parent.width
         spacing: Style.space(6)
-        visible: !root.lyricsInstallPromptVisible
 
         Text {
           width: parent.width - openButton.width - Style.space(6)
@@ -1464,19 +1411,7 @@ BarWidget {
         }
       }
 
-        LyricsInstallPrompt {
-          width: parent.width
-          visible: root.lyricsInstallPromptVisible
-          service: root.spotify
-          foreground: root.foreground
-          muted: root.muted
-          surfaceKey: root.lyricsRequestKey
-          cancelHasCursor: root.miniCursorActive
-            && root.miniCursor === "prompt-cancel"
-          confirmHasCursor: root.miniCursorActive
-            && root.miniCursor === "prompt-confirm"
-          onCanceled: root.dismissLyricsInstallPrompt()
-        }
+
       }
 
       Column {
@@ -1545,21 +1480,6 @@ BarWidget {
           }
         }
       }
-    }
-  }
-
-  Connections {
-    target: root.spotify
-    ignoreUnknownSignals: true
-    function onLyricsPluginPromptRequested(surface, availability) {
-      if (String(surface) !== root.lyricsRequestKey) return
-      root.lyricsInstallPromptVisible = true
-      root.popupOpen = true
-    }
-    function onLyricsPluginOpened(surface) {
-      if (String(surface) !== root.lyricsRequestKey) return
-      root.lyricsInstallPromptVisible = false
-      root.close()
     }
   }
 

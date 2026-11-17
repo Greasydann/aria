@@ -421,39 +421,78 @@ TestCase {
       .positionSeconds, 180)
   }
 
-  function test_optionalLyricsPluginRequiresConfirmationBeforeSetup() {
-    compare(Api.optionalPluginState(false, false), "missing")
-    compare(Api.optionalPluginState(true, false), "disabled")
-    compare(Api.optionalPluginState(true, true), "ready")
+  function test_parseSyncedLyrics_extractsTimestampsAndSorts() {
+    var lrc = "[by:caster]\n"
+      + "[01:05.00] later line\n"
+      + "[00:03.50] middle line\n"
+      + "[00:00:00] opening\n"
+      + "no timestamp line\n"
+      + "\n"
+    var lines = Api.parseSyncedLyrics(lrc)
+    compare(lines.length, 3)
+    compare(lines[0].time, 0)
+    compare(lines[0].text, "opening")
+    compare(lines[1].time, 3.5)
+    compare(lines[1].text, "middle line")
+    compare(lines[2].time, 65)
+    compare(lines[2].text, "later line")
+    compare(Api.parseSyncedLyrics("").length, 0)
+    compare(Api.parseSyncedLyrics("[by:x] no stamps").length, 0)
+  }
 
-    compare(Api.optionalPluginSetupCommand("missing", "stappmus.lyrics",
-      "https://github.com/stappmus/Omasing.git"), [
-        "/usr/bin/omarchy", "plugin", "add",
-        "https://github.com/stappmus/Omasing.git", "--enable", "--yes"
-      ])
-    compare(Api.optionalPluginSetupCommand("disabled", "stappmus.lyrics",
-      "https://github.com/stappmus/Omasing.git"), [
-        "/usr/bin/omarchy", "plugin", "enable", "stappmus.lyrics",
-        "--section", "center"
-      ])
-    compare(Api.optionalPluginSetupCommand("ready", "stappmus.lyrics",
-      "https://github.com/stappmus/Omasing.git"), [])
+  function test_normalizeLrcLibResult_guardsPayloadAndDuration() {
+    verify(Api.normalizeLrcLibResult(null, "t", 180) === null)
+    verify(Api.normalizeLrcLibResult({}, "t", 180) === null)
 
-    var song = { id: "spotify:track:one", title: "Song", artist: "Artist" }
-    var intent = Api.lyricsInstallIntent(song, "spotify-panel-lyrics", 1000)
-    compare(intent.surface, "spotify-panel-lyrics")
-    compare(intent.song.title, "Song")
-    verify(Api.lyricsInstallIntentIsFresh(intent, 1000, 180000))
-    verify(Api.lyricsInstallIntentIsFresh(intent, 180999, 180000))
-    verify(!Api.lyricsInstallIntentIsFresh(intent, 181000, 180000))
-    compare(Api.lyricsInstallIntent(null, "surface", 1000), null)
-    compare(Api.sessionWithoutLyricsInstall({
-      lastRadioPlaylist: "keep",
-      pendingLyricsInstall: intent
-    }).lastRadioPlaylist, "keep")
-    compare(Api.sessionWithoutLyricsInstall({
-      pendingLyricsInstall: intent
-    }).pendingLyricsInstall, undefined)
+    var synced = Api.normalizeLrcLibResult({
+      duration: 181, instrumental: false,
+      syncedLyrics: "[00:01.00] hello", plainLyrics: ""
+    }, "track-1", 180)
+    compare(synced.trackId, "track-1")
+    compare(synced.lines.length, 1)
+    compare(synced.lines[0].text, "hello")
+    verify(!synced.instrumental)
+
+    var instrumental = Api.normalizeLrcLibResult({
+      duration: 180, instrumental: true, syncedLyrics: "", plainLyrics: ""
+    }, "track-1", 180)
+    verify(instrumental.instrumental)
+
+    var plain = Api.normalizeLrcLibResult({
+      duration: 180, plainLyrics: "just words"
+    }, "track-1", 180)
+    compare(plain.plain, "just words")
+
+    // A payload whose duration disagrees with the playing track is rejected.
+    verify(Api.normalizeLrcLibResult({
+      duration: 90, syncedLyrics: "[00:01.00] hello"
+    }, "track-1", 180) === null)
+  }
+
+  function test_pickLrcLibResult_prefersDurationThenNames() {
+    var song = { title: "Lost", artist: "Frank Ocean", duration: 233 }
+    var rows = [
+      { duration: 233, trackName: "Lost (Live)", artistName: "Someone Else" },
+      { duration: 240, trackName: "Lost", artistName: "Frank Ocean" },
+      { duration: 233, trackName: "Lost", artistName: "Frank Ocean" }
+    ]
+    compare(Api.pickLrcLibResult(rows, song), rows[2])
+    verify(Api.pickLrcLibResult([{ duration: 300, trackName: "Lost",
+      artistName: "Frank Ocean" }], song) === null)
+    compare(Api.pickLrcLibResult([], song), null)
+    verify(Api.pickLrcLibResult([{ duration: 233, trackName: "Whatever",
+      artistName: "Whatever" }], song) !== null)
+  }
+
+  function test_lyricsUrls_pointAtLrcLib() {
+    var song = { title: "Lost", artist: "Frank Ocean", album: "channel ORANGE",
+      duration: 233.4 }
+    verify(Api.lyricsLookupUrl(song).indexOf(
+      "https://lrclib.net/api/get") === 0)
+    verify(Api.lyricsLookupUrl(song).indexOf("artist_name=Frank+Ocean") >= 0
+      || Api.lyricsLookupUrl(song).indexOf("artist_name=Frank%20Ocean") >= 0)
+    verify(Api.lyricsSearchUrl(song).indexOf(
+      "https://lrclib.net/api/search") === 0)
   }
 
   function test_sessionRecord_roundTripsAndMigratesPluginSettings() {

@@ -32,6 +32,8 @@ Item {
     onTriggered: root.searchClock = Date.now()
   }
   property string searchText: ""
+  // Built-in lyrics view over the full player's page.
+  property bool lyricsViewOpen: false
   property string searchType: "track"
   property string libraryType: "tracks"
   property string homeType: "recent"
@@ -97,7 +99,6 @@ Item {
 
   readonly property string pluginId: manifest && manifest.id
     ? String(manifest.id) : "aria"
-  readonly property string lyricsRequestKey: "spotify-panel-lyrics"
   readonly property color foreground: Theme.Color.foreground
   readonly property color background: Theme.Color.background
   readonly property color accent: Theme.Color.accent
@@ -126,7 +127,7 @@ Item {
     && artistSearchText.trim() !== ""
   readonly property bool shortcutsBlocked: mediaContextMenu.opened
     || playlistPicker.opened || createPlaylistPopup.opened || sleepPopup.opened
-    || shortcutHelpPopup.opened || lyricsInstallPopup.opened
+    || shortcutHelpPopup.opened
   readonly property bool shortcutHintsEnabled: service
     ? service.shortcutHintsEnabled : true
   readonly property bool typingInField: {
@@ -340,10 +341,6 @@ Item {
   }
 
   function dismissTransientPopup() {
-    if (lyricsInstallPopup.opened && (!service || !service.lyricsPluginBusy)) {
-      lyricsInstallPopup.close()
-      return true
-    }
     if (shortcutHelpPopup.opened) {
       shortcutHelpPopup.close()
       return true
@@ -1513,7 +1510,7 @@ Item {
       return handleContextMenuKey(event)
 
     if (createPlaylistPopup.opened || playlistPicker.opened
-        || shortcutHelpPopup.opened || lyricsInstallPopup.opened)
+        || shortcutHelpPopup.opened)
       return false
 
     if (unifiedSearchField.activeFocus && tabbing) {
@@ -1863,8 +1860,7 @@ Item {
 
   function openLyrics() {
     if (!service || !service.lyricsAvailable) return
-    var result = service.requestLyrics(lyricsRequestKey)
-    if (result !== "opening") lyricsInstallPopup.open()
+    lyricsViewOpen = !lyricsViewOpen
   }
 
   function open(payloadJson) {
@@ -1897,6 +1893,8 @@ Item {
     }
     closingFromHost = false
     opened = true
+    lyricsViewOpen = payload.lyrics === true && service
+      && service.lyricsAvailable
     if (payload.shortcutLatch) {
       latchShortcutMode()
       panelCursorActive = true
@@ -2401,55 +2399,6 @@ Item {
           }
         }
       }
-    }
-  }
-
-  Popup {
-    id: lyricsInstallPopup
-    parent: window.contentItem
-    x: Math.max(Style.space(8), (window.width - width) / 2)
-    y: Math.max(Style.space(8), (window.height - height) / 2)
-    width: Math.min(Style.space(400), window.width - Style.space(32))
-    height: lyricsInstallContent.implicitHeight + padding * 2
-    padding: Style.space(10)
-    modal: true
-    focus: true
-    closePolicy: root.service && root.service.lyricsPluginBusy
-      ? Popup.NoAutoClose
-      : Popup.CloseOnEscape | Popup.CloseOnPressOutside
-
-    onOpened: root.disarmEscapeClose()
-    onClosed: {
-      if (root.service && !root.service.lyricsPluginBusy)
-        root.service.cancelLyricsPlugin(root.lyricsRequestKey)
-      Qt.callLater(function() { focusScope.forceActiveFocus() })
-    }
-
-    background: BorderSurface {
-      color: root.popupBackground
-      radius: Style.cornerRadius
-      borderSpec: root.popupBorderSpec
-    }
-
-    contentItem: LyricsInstallPrompt {
-      id: lyricsInstallContent
-      width: parent.width
-      service: root.service
-      foreground: root.foreground
-      muted: root.muted
-      surfaceKey: root.lyricsRequestKey
-      onCanceled: lyricsInstallPopup.close()
-    }
-  }
-
-  Connections {
-    target: root.service
-    ignoreUnknownSignals: true
-    function onLyricsPluginPromptRequested(surface, availability) {
-      if (String(surface) === root.lyricsRequestKey) lyricsInstallPopup.open()
-    }
-    function onLyricsPluginOpened(surface) {
-      if (String(surface) === root.lyricsRequestKey) lyricsInstallPopup.close()
     }
   }
 
@@ -3263,7 +3212,7 @@ Item {
           && root.service && root.service.lyricsAvailable
         onActivated: {
           root.latchShortcutMode(sequence)
-          root.openLyrics()
+          root.lyricsViewOpen = !root.lyricsViewOpen
         }
       }
       Shortcut {
@@ -4078,6 +4027,33 @@ Item {
               anchors.bottom: parent.bottom
               sourceComponent: root.pageComponent()
             }
+
+            // Built-in lyrics: covers the page while open, like the
+            // desktop client's lyrics view.
+            Item {
+              id: lyricsOverlay
+              visible: root.lyricsViewOpen
+              anchors.fill: parent
+              anchors.topMargin: pageLoader.anchors.topMargin
+
+              LyricsView {
+                id: lyricsView
+                anchors.fill: parent
+                visible: lyricsOverlay.visible
+                lyrics: root.service ? root.service.activeLyrics : null
+                status: root.service ? root.service.lyricsStatus : ""
+                errorText: root.service ? root.service.lyricsError : ""
+                foreground: root.foreground
+                accent: root.accent
+                fontFamily: root.fontFamily
+                positionSeconds: root.service ? root.service.positionSeconds : 0
+                onSeekRequested: function(seconds) {
+                  if (root.service) root.service.seekSeconds(seconds)
+                }
+                onRetryRequested: if (root.service) root.service.retryLyrics()
+                onClosed: root.lyricsViewOpen = false
+              }
+            }
           }
         }
 
@@ -4425,11 +4401,11 @@ Item {
                   visible: !root.extraNarrowWidth
                   glyphText: "󰎈"
                   foreground: root.foreground
+                  selected: root.lyricsViewOpen
                   hasCursor: root.cursorOn("footer", "lyrics")
-                  tooltipText: root.shortcutHint("Open lyrics in Omasing",
-                    "Ctrl+Shift+L")
+                  tooltipText: root.shortcutHint("Lyrics", "Ctrl+Shift+L")
                   enabled: root.service && root.service.lyricsAvailable
-                  onClicked: root.openLyrics()
+                  onClicked: root.lyricsViewOpen = !root.lyricsViewOpen
                   onHovered: function(on) { root.hoverPanelCursor("footer", "lyrics", on) }
                   KeyHint { region: "footer"; action: "lyrics"; sequences: ["Ctrl+Shift+L"] }
                 }

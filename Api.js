@@ -999,46 +999,99 @@ function lyricsSong(trackId, title, artist, album, duration, coverUrl,
   }
 }
 
-function optionalPluginState(installed, enabled) {
-  if (installed !== true) return "missing"
-  return enabled === true ? "ready" : "disabled"
-}
-
 // Installation runs non-interactively only after the app's own confirmation
 // prompt. Keep the repository and plugin id as separate argv entries so no
 // user-controlled text is ever interpreted by a shell.
-function optionalPluginSetupCommand(state, pluginId, repositoryUrl) {
-  var availability = String(state || "")
-  var id = String(pluginId || "").trim()
-  var url = String(repositoryUrl || "").trim()
-  // Use the absolute binary so a Quickshell Process/execDetached does not
-  // depend on the shell's PATH. --yes keeps add non-interactive.
-  if (availability === "missing" && url)
-    return ["/usr/bin/omarchy", "plugin", "add", url, "--enable", "--yes"]
-  if (availability === "disabled" && id)
-    return ["/usr/bin/omarchy", "plugin", "enable", id, "--section", "center"]
-  return []
+// --- Built-in lyrics (lrclib.net) ---
+
+// Parse an LRC payload ("[mm:ss.xx] text") into sorted {time, text} rows.
+// Metadata tags such as [by:] produce no time stamps and are dropped.
+function parseSyncedLyrics(lrc) {
+  var rows = []
+  var source = String(lrc || "").split("\n")
+  for (var i = 0; i < source.length; i++) {
+    var line = source[i]
+    var stamps = line.match(/\[\d+:\d+(?:[.:]\d+)?\]/g)
+    if (!stamps || !stamps.length) continue
+    var text = line.replace(/\[[^\]]*\]/g, "").trim()
+    for (var s = 0; s < stamps.length; s++) {
+      var m = stamps[s].match(/\[(\d+):(\d+(?:[.:]\d+)?)\]/)
+      var minutes = parseInt(m[1], 10)
+      var seconds = parseFloat(String(m[2]).replace(":", "."))
+      if (!isFinite(minutes) || !isFinite(seconds)) continue
+      rows.push({ time: minutes * 60 + seconds, text: text })
+    }
+  }
+  rows.sort(function(a, b) { return a.time - b.time })
+  return rows
 }
 
-function lyricsInstallIntent(song, surface, now) {
-  if (!song || typeof song !== "object") return null
+// Turn an lrclib.net payload into a lyrics record, or null when it holds
+// nothing usable or describes a different track (duration far off).
+function normalizeLrcLibResult(payload, trackId, durationSeconds) {
+  if (!payload || typeof payload !== "object") return null
+  var synced = parseSyncedLyrics(payload.syncedLyrics)
+  var plain = String(payload.plainLyrics || "")
+  var instrumental = payload.instrumental === true
+  if (!synced.length && !plain && !instrumental) return null
+  var duration = Number(payload.duration)
+  if (isFinite(duration) && Number(durationSeconds) > 0
+      && Math.abs(duration - Number(durationSeconds)) > 12) return null
   return {
-    song: song,
-    surface: String(surface || ""),
-    startedAt: Number(now) || Date.now()
+    trackId: String(trackId || ""),
+    instrumental: instrumental,
+    lines: synced,
+    plain: plain,
+    trackName: String(payload.trackName || ""),
+    artistName: String(payload.artistName || ""),
+    albumName: String(payload.albumName || "")
   }
 }
 
-function lyricsInstallIntentIsFresh(intent, now, lifetimeMs) {
-  if (!intent || typeof intent !== "object" || !intent.song) return false
-  return timestampIsFresh(intent.startedAt, now,
-    lifetimeMs === undefined ? 180000 : lifetimeMs)
+// The exact lookup endpoint for a playing song.
+function lyricsLookupUrl(song) {
+  return appendQuery("https://lrclib.net/api/get", {
+    artist_name: song.artist,
+    track_name: song.title,
+    album_name: song.album || "",
+    duration: Math.max(1, Math.round(Number(song.duration) || 0))
+  })
 }
 
-function sessionWithoutLyricsInstall(session) {
-  var next = shallowCopy(session)
-  delete next.pendingLyricsInstall
-  return next
+// The search fallback when the exact lookup has no match.
+function lyricsSearchUrl(song) {
+  return appendQuery("https://lrclib.net/api/search", {
+    q: (song.artist + " " + song.title).trim()
+  })
+}
+
+// Choose the best search hit: closest duration, then title and artist
+// agreement. Tolerates a missing song duration.
+function pickLrcLibResult(results, song) {
+  var rows = arrayValues(results)
+  var best = null
+  var bestScore = -1
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i]
+    if (!row || typeof row !== "object") continue
+    var score = 0
+    var duration = Number(row.duration)
+    var wanted = Number(song.duration) || 0
+    if (isFinite(duration) && wanted > 0) {
+      var drift = Math.abs(duration - wanted)
+      if (drift > 4) continue
+      score += 3 - Math.min(3, drift)
+    }
+    var title = String(row.trackName || "").toLowerCase()
+    var wantedTitle = String(song.title || "").toLowerCase()
+    if (title && title === wantedTitle) score += 2
+    else if (title && title.indexOf(wantedTitle) >= 0) score += 1
+    var artist = String(row.artistName || "").toLowerCase()
+    if (artist && artist.indexOf(String(song.artist || "").toLowerCase()) >= 0)
+      score += 1
+    if (score > bestScore) { bestScore = score; best = row }
+  }
+  return best
 }
 
 var SESSION_STATE_LIMIT = 16000
