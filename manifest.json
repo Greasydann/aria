@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "spoty",
+  "id": "aria",
   "name": "Aria",
-  "version": "1.1.0",
-  "author": "QuickshellSpotify",
+  "version": "1.0.0",
+  "author": "stappmus",
   "license": "MIT",
   "description": "Aria: a Spotify player for Omarchy in the spirit of quickshell.spotify, with local playback via Soloist.",
   "kinds": [

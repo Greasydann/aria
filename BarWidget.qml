@@ -11,13 +11,13 @@ import "Api.js" as Api
 BarWidget {
   id: root
 
-  moduleName: "spoty"
+  moduleName: "aria"
 
   readonly property var spotify: bar && bar.shell
-    ? bar.shell.serviceFor("spoty") : null
+    ? bar.shell.serviceFor("aria") : null
   readonly property color foreground: bar ? bar.foreground : Theme.Color.foreground
   readonly property color muted: Theme.Color.muted
-  readonly property string surfaceKey: "spoty-popup-" + String(root)
+  readonly property string surfaceKey: "aria-popup-" + String(root)
   readonly property string lyricsRequestKey: surfaceKey + "-lyrics"
   readonly property string barText: spotify
     ? Api.barTrackText(spotify.title, spotify.artist,
@@ -301,14 +301,14 @@ BarWidget {
       // Remap an existing full player onto the workspace containing this bar.
       // Splitting hide and summon across event-loop turns lets Wayland finish
       // unmapping the old surface before the shell opens it here.
-      bar.shell.hide("spoty")
+      bar.shell.hide("aria")
       Qt.callLater(function() {
         if (root.bar && root.bar.shell)
-          root.bar.shell.summon("spoty", encoded)
+          root.bar.shell.summon("aria", encoded)
       })
     } else if (payload && typeof bar.shell.summon === "function")
-      bar.shell.summon("spoty", encoded)
-    else bar.shell.toggle("spoty", encoded)
+      bar.shell.summon("aria", encoded)
+    else bar.shell.toggle("aria", encoded)
   }
 
   function openCurrentArtist() {

@@ -21,7 +21,7 @@ Item {
   property var pluginRegistry: null
 
   readonly property string pluginId: manifest && manifest.id
-    ? String(manifest.id) : "spoty"
+    ? String(manifest.id) : "aria"
   readonly property string pluginDir: {
     var url = String(Qt.resolvedUrl("./"))
     return url.indexOf("file://") === 0
@@ -37,7 +37,7 @@ Item {
   readonly property string sessionPath: stateDir + "/session.json"
 
   readonly property var defaultSettingValues: ({
-    deviceName: "Spoty",
+    deviceName: "Aria",
     idleShutdownMinutes: 15,
     showMiniPlayer: "On",
     showVinylRecord: "Off",
@@ -112,11 +112,11 @@ Item {
 
   // The real Soloist Spotify-Connect receiver, resolvable from the last
   // live playback state or either device list. The synthetic fallback
-  // receiver ("soloist:spoty") is UI-only: Spotify's Web API does not know
+  // receiver ("soloist:aria") is UI-only: Spotify's Web API does not know
   // that id and answers 404 when a play request aims at it.
   function realSoloistConnectDevice() {
     var snapshot = soloistConnectSnapshot
-    if (snapshot && snapshot.id && String(snapshot.id) !== "soloist:spoty"
+    if (snapshot && snapshot.id && String(snapshot.id) !== "soloist:aria"
         && isSoloistName(snapshot.sourceName || snapshot.name)) {
       return snapshot
     }
@@ -126,7 +126,7 @@ Item {
       for (var i = 0; i < list.length; i++) {
         var candidate = list[i]
         if (candidate && candidate.id
-            && String(candidate.id) !== "soloist:spoty"
+            && String(candidate.id) !== "soloist:aria"
             && isSoloistName(candidate.sourceName || candidate.name)) {
           return candidate
         }
@@ -140,7 +140,7 @@ Item {
   // id, or "" while Soloist's registration is not visible.
   function playbackTargetId(deviceId) {
     var id = String(deviceId || "")
-    if (id !== "soloist:spoty") return id
+    if (id !== "soloist:aria") return id
     var real = realSoloistConnectDevice()
     return real ? String(real.id) : ""
   }
@@ -849,7 +849,7 @@ Item {
       || identity.indexOf("librespot") !== -1
   }
 
-  // Official Spotify desktop client (local playback target for Spoty hybrid mode).
+  // Official Spotify desktop client (legacy local playback target).
   function isOfficialSpotifyPlayer(player) {
     if (!player) return false
     if (isEmbeddedOmarchyBackendPlayer(player)) return false
@@ -1100,14 +1100,14 @@ Item {
   property bool localPlaybackStopped: false
 
   function ensureVisibleLocalReceiver() {
-    // Spoty uses Soloist/official client for local playback; never start the
+    // Aria uses Soloist for local playback; never start the
     // embedded omarchy-spotify backend (which advertises "Omarchy Spotify").
     cancelVisibleLocalDeviceRefresh()
     return
   }
 
   function refreshVisibleLocalDevice() {
-    // Spoty: no embedded omarchy-spotify receiver.
+    // Aria: no embedded omarchy-spotify receiver.
     cancelVisibleLocalDeviceRefresh()
     return
   }
@@ -1390,7 +1390,7 @@ Item {
     if (!track.uri) return null
     return {
       device: {
-        id: "soloist:spoty",
+        id: "soloist:aria",
         name: root.soloistDeviceName || "Aria",
         sourceName: "Soloist",
         type: "Computer",
@@ -1415,7 +1415,7 @@ Item {
 
   function applySoloistFallback() {
     if (!soloistPlayback || !soloistPlayback.item) return false
-    // Spoty uses Soloist as the playback target: prefer Soloist state for UI.
+    // Aria uses Soloist as the playback target: prefer Soloist state for UI.
     remotePlayback = soloistPlayback
     playbackPositionTick++
     // Playback is demonstrably healthy; drop stale transient errors (such as
@@ -1442,8 +1442,8 @@ Item {
       // Remember Soloist's real Spotify-Connect receiver while it is the
       // live playback device, so its routable id survives device-list
       // blinks (the Soloist fallback replaces the UI state with the
-      // synthetic "soloist:spoty" receiver right after this).
-      if (device.id && String(device.id) !== "soloist:spoty"
+      // synthetic "soloist:aria" receiver right after this).
+      if (device.id && String(device.id) !== "soloist:aria"
           && isSoloistName(device.sourceName || device.name)) {
         soloistConnectSnapshot = Api.shallowCopy(device)
       }
@@ -1489,7 +1489,7 @@ Item {
         loadDevices()
       }
     }
-    // Prefer Soloist state for Spoty UI when available.
+    // Prefer Soloist state for Aria UI when available.
     root.applySoloistFallback()
   }
 
@@ -2717,7 +2717,7 @@ Item {
   function loadHome() {
     // The omarchy-spotify backend answers 501 for the history and
     // top-ranking endpoints under native sign-in (its streaming token
-    // cannot read them). Spoty reads them with the panel's own full-scope
+    // cannot read them). Aria reads them with the panel's own full-scope
     // OAuth session instead; without it the page stays gracefully empty
     // and offers the sign-in.
     if (!webAuthManager.loggedIn) {
@@ -2877,10 +2877,10 @@ Item {
   function mergeConnectDevices() {
     var local = spotifyConnectManager.devices || []
     var current = remoteDevice && remoteDevice.active === true ? remoteDevice : null
-    // The Soloist fallback device is synthetic ("soloist:spoty"). Resolve it
+    // The Soloist fallback device is synthetic ("soloist:aria"). Resolve it
     // to the real Soloist Connect device so it never appears as a duplicate
     // phantom entry next to the actual device.
-    if (current && String(current.id || "") === "soloist:spoty") {
+    if (current && String(current.id || "") === "soloist:aria") {
       var resolved = null
       for (var resolveIndex = 0; resolveIndex < apiDevices.length; resolveIndex++) {
         var resolveCandidate = apiDevices[resolveIndex]
@@ -3144,7 +3144,7 @@ Item {
       ? surface[method]() : "unavailable"
   }
   IpcHandler {
-    target: "spoty.player"
+    target: "aria.player"
     function configuredPlayer(): string { return root.shortcutPlayer }
     function togglePlayer(): string { return root.invokePlayerShortcut("toggleConfiguredPlayerShortcut") }
     function toggleMiniPlayer(): string { return root.invokePlayerShortcut("toggleMiniPlayerShortcut") }
@@ -3348,7 +3348,7 @@ Item {
     if (playbackSerial !== pendingPlaybackSerial || !pendingPlaybackBody) return
     var target = autoselectLocalDevice() || chooseDevice()
 
-    // Spoty: Soloist is the single local playback target. The official
+    // Aria: Soloist is the single local playback target. The official
     // Spotify desktop app is never launched or targeted for audio.
     var soloist = soloistTarget()
     var soloistId = soloist ? playbackTargetId(soloist.id) : ""
@@ -3389,7 +3389,7 @@ Item {
       clearPendingPlayback()
       return
     }
-    fail("Soloist (Spoty) is not available as a playback device. Make sure it is running and logged in, then try again")
+    fail("Soloist (Aria) is not available as a playback device. Make sure it is running and logged in, then try again")
     clearPendingPlayback()
   }
 
@@ -3404,7 +3404,7 @@ Item {
       clearPendingPlayback()
       return
     }
-    // daemon start disabled for Spoty
+    // daemon start disabled for Aria
     localSocketWaitAttempts = 0
     localSocketWaitTimer.restart()
   }
@@ -3492,7 +3492,7 @@ Item {
         deviceProbeTimer.restart()
       } else {
         root.clearPendingPlayback()
-        root.fail("Soloist (Spoty) is not available as a playback device. Make sure it is running and logged in, then try again")
+        root.fail("Soloist (Aria) is not available as a playback device. Make sure it is running and logged in, then try again")
       }
     })
   }
@@ -3998,7 +3998,7 @@ Item {
       deviceProbeTimer.restart()
       return
     }
-    // daemonManager.start(true) disabled for Spoty (Soloist-only)
+    // daemonManager.start(true) disabled for Aria (Soloist-only)
     deviceProbeTimer.restart()
   }
 
@@ -4658,7 +4658,7 @@ Item {
   NativeSession {
     id: authManager
     pluginDir: root.pluginDir
-    // Spoty keeps the native login/browsing session, but playback audio is
+    // Aria keeps the native login/browsing session, but playback audio is
     // routed to Soloist; the embedded playback engine stays off.
     enabled: daemonManager.playbackReady && !daemonManager.usingFallbackRuntime
   }
@@ -4695,7 +4695,7 @@ Item {
 
   BackendClient {
     id: backendClient
-    // Spoty uses Soloist for local playback; keep embedded backend client disabled.
+    // Aria uses Soloist for local playback; keep embedded backend client disabled.
     wanted: false
     onErrorCodeChanged: if (errorCode === "audio_key_unavailable")
       root.fail(errorMessage || "Spotify could not play this track on this computer")

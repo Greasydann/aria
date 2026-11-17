@@ -84,7 +84,7 @@ Item {
     diagnostics = diagnostics.concat([entry]).slice(-100)
     // Spoty debug: surface every failed request with its endpoint, so error
     // toasts can be traced to the exact call that produced them.
-    if (error) console.warn("spoty api fail:", entry.method, entry.route,
+    if (error) console.warn("aria api fail:", entry.method, entry.route,
       "status", status, "query", JSON.stringify(job.query || null),
       "-", String(error).slice(0, 120))
     releaseRequestSlot(job.handle)

@@ -166,7 +166,7 @@ Item {
     startSecretLookup()
   }
 
-  readonly property string tokenStoreDir: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/spoty"
+  readonly property string tokenStoreDir: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aria"
   function tokenStorePath(clientId) {
     var id = String(clientId || resolvedClientId || "").replace(/[^0-9a-f]/gi, "")
     return tokenStoreDir + "/refresh-token-" + (id || "default")
