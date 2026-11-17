@@ -962,8 +962,11 @@ Item {
     fetchLyrics(true)
   }
 
-  // Keep the view in sync with what is playing.
-  onCurrentTrackIdChanged: fetchLyrics()
+  // Keep the view in sync with what is playing. The song descriptor also
+  // changes when Soloist state arrives late after a shell restart, which a
+  // bare track-id watcher would miss (fetchLyrics re-checks the track and
+  // no-ops when the cached track already matches).
+  onCurrentLyricsSongChanged: fetchLyrics()
 
   function noteActivity() {
     lastActivityAt = Date.now()
