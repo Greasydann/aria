@@ -61,6 +61,28 @@ too.
 | `Ctrl+/` | See every keyboard shortcut |
 | `Ctrl+H` | Hide visible shortcut hints |
 
+## See it in action
+
+### Your playlists, instantly familiar
+
+Everything is where you expect it to be—just faster, lighter, and dressed in
+your Omarchy theme.
+
+![The Playlists page showing All Out 80s with a track list and the player bar at the bottom](docs/screenshots/playlist.webp)
+
+### Everything from an artist, in one view
+
+Top albums and EPs sit beside the artist's ten biggest songs, with their
+**This Is** playlist and full catalog only a search away.
+
+![The Frank Ocean artist page with top albums and top songs while Lost is playing](docs/screenshots/artist.webp)
+
+### A mini player that belongs in your desktop
+
+The essentials are always one click away, without reopening the full app.
+
+![The mini player showing Lost by Frank Ocean with playback controls and volume](docs/screenshots/mini-player.webp)
+
 ## Log in with Spotify
 
 Click the Spotify icon on the left side of the bar and choose **Log in**.
