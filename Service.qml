@@ -3830,13 +3830,6 @@ Item {
     deviceProbeTimer.restart()
   }
 
-  function stopEngine() {
-    localPlaybackStopped = true
-    cancelVisibleLocalDeviceRefresh()
-    clearPendingPlayback()
-    deviceProbeTimer.stop()
-  }
-
   function login() {
     if (authManager.loginBusy || authManager.sessionBusy) return
     noteActivity()

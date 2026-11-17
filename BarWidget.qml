@@ -115,7 +115,7 @@ BarWidget {
     { keys: "Esc", action: "Close" }
   ]
   readonly property var miniKeyboardActions: {
-    if (contextMenuVisible) return spotify && spotify.daemon.running ? ["stop", "open"] : ["open"]
+    if (contextMenuVisible) return ["open"]
     if (lyricsInstallPromptVisible) return ["prompt-cancel", "prompt-confirm"]
     if (miniShortcutHelpVisible) return ["help-close"]
     if (spotify && !spotify.accountConnected) {
@@ -446,10 +446,6 @@ BarWidget {
     } else if (action === "repeat") {
       if (spotify) spotify.cycleRepeat()
     } else if (action === "lyrics") openLyrics()
-    else if (action === "stop") {
-      if (spotify) spotify.stopEngine()
-      close()
-    }
     else if (action === "volume") toggleMute()
     else if (action === "setup") {
       if (spotify && !spotify.loginBusy) spotify.login()
@@ -846,15 +842,6 @@ BarWidget {
         visible: root.contextMenuVisible
         spacing: Style.space(6)
         Button {
-          text: "Stop playback on this computer"
-          iconText: "󰓛"
-          foreground: root.foreground
-          visible: root.spotify && root.spotify.daemon.running
-          enabled: root.spotify && !root.spotify.daemon.busy
-          hasCursor: root.miniCursorActive && root.miniCursor === "stop"
-          onClicked: root.activateMiniAction("stop")
-        }
-        Button {
           text: "Open full player"
           foreground: root.foreground
           hasCursor: root.miniCursorActive && root.miniCursor === "open"
@@ -906,7 +893,7 @@ BarWidget {
 
         Text {
           width: parent.width
-          text: "Connect your Spotify account from here. Playback on this computer can finish in the background."
+          text: "Connect your Spotify account from here."
           color: root.muted
           font.family: root.bar ? root.bar.fontFamily : Style.font.family
           font.pixelSize: Style.font.caption
@@ -916,11 +903,9 @@ BarWidget {
         Text {
           width: parent.width
           visible: root.spotify && (root.spotify.lastError !== ""
-            || root.spotify.auth.lastError !== ""
-            || root.spotify.daemon.lastError !== "")
+            || root.spotify.auth.lastError !== "")
           text: root.spotify ? (root.spotify.lastError
-            || root.spotify.auth.lastError
-            || root.spotify.daemon.lastError) : ""
+            || root.spotify.auth.lastError) : ""
           color: Theme.Color.urgent
           font.family: root.bar ? root.bar.fontFamily : Style.font.family
           font.pixelSize: Style.font.caption
@@ -1459,8 +1444,7 @@ BarWidget {
             : (root.spotify.useRemotePlayback
               ? (root.spotify.playing ? "Playing on " : "Connected to ")
                 + root.spotify.playbackDeviceName
-              : (root.spotify.daemon.running ? "Playing on this computer"
-                : "Ready when you press play"))))))
+              : "Ready when you press play")))))
           color: root.muted
           font.family: root.bar ? root.bar.fontFamily : Style.font.family
           font.pixelSize: Style.font.caption
