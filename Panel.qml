@@ -4030,11 +4030,12 @@ Item {
 
             // Built-in lyrics: covers the page while open, like the
             // desktop client's lyrics view.
-            Item {
+            Rectangle {
               id: lyricsOverlay
               visible: root.lyricsViewOpen
               anchors.fill: parent
-              anchors.topMargin: pageLoader.anchors.topMargin
+              color: root.background
+              z: 10
 
               LyricsView {
                 id: lyricsView
