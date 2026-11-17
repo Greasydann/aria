@@ -1305,6 +1305,18 @@ Item {
 
   function applySoloistFallback() {
     if (!soloistPlayback || !soloistPlayback.item) return false
+    // When Soloist pauses it stops reporting `pos` in its state payload.
+    // Keep the last known position (of the same track) so a paused track
+    // does not snap back to its start; a new track starts at zero anyway.
+    if (soloistPlayback.playing === false
+        && Number(soloistPlayback.progressSeconds) === 0
+        && remotePlayback && remotePlayback.playing !== undefined
+        && String(remotePlayback.item && remotePlayback.item.uri)
+          === String(soloistPlayback.item.uri)
+        && Number(remotePlayback.progressSeconds) > 0) {
+      soloistPlayback.progressSeconds = remotePlayback.progressSeconds
+      soloistPlayback.receivedAt = remotePlayback.receivedAt
+    }
     // Aria uses Soloist as the playback target: prefer Soloist state for UI.
     remotePlayback = soloistPlayback
     playbackPositionTick++
