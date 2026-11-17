@@ -54,8 +54,8 @@ Item {
   }
   readonly property bool syncedView: status === "found" && lines.length > 0
 
-  // The text block is translated so the active line's center sits at the
-  // viewport's center — always, including the first and last lines.
+  // Keep the highlighted line at the vertical center of the viewport,
+  // like the desktop client's lyrics page. Skipped while the user drags.
   function updateLyricsOffset() {
     if (!syncedView) return
     var item = linesRepeater.itemAt(activeIndex)
@@ -118,6 +118,10 @@ Item {
       id: linesColumn
       width: parent.width
       spacing: Style.space(18)
+      readonly property real activeLineCenter: {
+        var item = linesRepeater.itemAt(root.activeIndex)
+        return item ? item.y + item.height / 2 : 0
+      }
       y: viewport.height / 2 - activeLineCenter
       Behavior on y { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
 
