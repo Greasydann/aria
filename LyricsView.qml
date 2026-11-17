@@ -3,9 +3,9 @@ import qs.Commons
 import qs.Commons as Theme
 import qs.Ui
 
-// Synced lyrics for the playing track. The active line highlights and the
-// view keeps it centered; clicking a line seeks there. Unsynced lyrics show
-// as plain text without highlighting.
+// Synced lyrics for the playing track, Spotify-style: the active line
+// highlights and the view follows it; clicking a line seeks there.
+// Unsynced lyrics show as plain text without highlighting.
 Item {
   id: root
 
@@ -14,7 +14,7 @@ Item {
   property string errorText: ""
   property color foreground: Theme.Color.foreground
   property color muted: Theme.Color.muted
-  property color accent: Commons.Color.accent
+  property color accent: Theme.Color.accent
   property string fontFamily: Style.font.family
   property real positionSeconds: 0
   signal seekRequested(real seconds)
@@ -33,19 +33,17 @@ Item {
     }
     return index
   }
-  readonly property real rowHeight: Style.space(34)
   readonly property bool syncedView: status === "found" && lines.length > 0
 
+  onActiveIndexChanged: Qt.callLater(scrollToActive)
+  onVisibleChanged: if (visible) Qt.callLater(scrollToActive)
+
+  // Minimal scroll: only moves when the active line is out of view, and
+  // always in the direction of the line (never up when the line is below).
   function scrollToActive() {
     if (!syncedView || activeIndex < 0) return
-    var target = Math.max(0, Math.min(flickable.contentHeight - flickable.height,
-      activeIndex * rowHeight + rowHeight / 2 - flickable.height / 2))
-    flickable.contentY = target
+    view.positionViewAtIndex(activeIndex, ListView.Contain)
   }
-
-  onActiveIndexChanged: scrollToActive()
-  onLinesChanged: Qt.callLater(scrollToActive)
-  onVisibleChanged: if (visible) Qt.callLater(scrollToActive)
 
   Column {
     id: header
@@ -56,7 +54,6 @@ Item {
     spacing: Style.space(4)
 
     Button {
-      id: backButton
       text: "Back"
       iconText: "󰅂"
       foreground: root.foreground
@@ -87,129 +84,112 @@ Item {
     }
   }
 
-  Flickable {
-    id: flickable
+  ListView {
+    id: view
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: header.bottom
     anchors.bottom: parent.bottom
     anchors.margins: Style.space(10)
-    contentWidth: width
-    contentHeight: statusBody.height
+    model: root.syncedView ? root.lines : []
+    visible: root.syncedView
+    spacing: Style.space(12)
     clip: true
     boundsBehavior: Flickable.StopAtBounds
 
-    Column {
-      id: statusBody
-      width: flickable.width
-      spacing: Style.space(6)
+    delegate: Item {
+      id: lineDelegate
+      required property var modelData
+      required property int index
+      width: view.width
+      height: lineText.implicitHeight + Style.space(14)
+      readonly property bool isActive: index === root.activeIndex
 
       Text {
+        id: lineText
+        anchors.verticalCenter: parent.verticalCenter
         width: parent.width
-        visible: root.status === "loading"
-        text: "Loading lyrics…"
-        color: root.muted
+        text: lineDelegate.modelData.text !== "" ? lineDelegate.modelData.text : "♪"
+        color: lineDelegate.isActive ? root.accent
+          : (lineDelegate.index < root.activeIndex ? root.foreground : root.muted)
+        opacity: lineDelegate.isActive ? 1 : 0.8
         font.family: root.fontFamily
-        font.pixelSize: Style.font.body
+        font.pixelSize: lineDelegate.isActive
+          ? Style.font.subtitle : Style.font.body
+        font.bold: lineDelegate.isActive
+        wrapMode: Text.WordWrap
+        Behavior on color { ColorAnimation { duration: Style.duration(150) } }
       }
 
-      Text {
-        width: parent.width
-        visible: root.status === "notfound"
-        text: "No lyrics found for this track."
-        color: root.muted
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
+      MouseArea {
+        anchors.fill: parent
+        cursorShape: Qt.PointingHandCursor
+        onClicked: root.seekRequested(lineDelegate.modelData.time)
       }
+    }
+  }
 
-      Text {
-        width: parent.width
-        visible: root.status === "instrumental"
-        text: "♪  Instrumental track"
-        color: root.accent
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.subtitle
-        font.bold: true
-      }
+  // Status overlays for the non-synced states
+  Column {
+    anchors.fill: parent
+    anchors.topMargin: header.height + Style.space(10)
+    visible: !root.syncedView
 
-      Column {
-        width: parent.width
-        spacing: Style.space(4)
-        visible: root.status === "error"
+    Text {
+      width: parent.width
+      visible: root.status === "loading"
+      text: "Loading lyrics…"
+      color: root.muted
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.body
+    }
 
-        Text {
-          width: parent.width
-          text: root.errorText || "Could not load lyrics."
-          color: Theme.Color.urgent
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.body
-        }
+    Text {
+      width: parent.width
+      visible: root.status === "notfound"
+      text: "No lyrics found for this track."
+      color: root.muted
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.body
+    }
 
-        Button {
-          text: "Try again"
-          iconText: "󰑐"
-          foreground: root.foreground
-          onClicked: root.retryRequested()
-        }
-      }
+    Text {
+      width: parent.width
+      visible: root.status === "instrumental"
+      text: "♪  Instrumental track"
+      color: root.accent
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.subtitle
+      font.bold: true
+    }
 
-      Column {
-        width: parent.width
-        spacing: Style.space(8)
-        visible: root.status === "plain"
+    Text {
+      width: parent.width
+      visible: root.status === "plain"
+      textFormat: Text.PlainText
+      text: root.lyrics ? root.lyrics.plain : ""
+      color: root.foreground
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.body
+      wrapMode: Text.WordWrap
+    }
 
-        Text {
-          width: parent.width
-          textFormat: Text.PlainText
-          text: root.lyrics ? root.lyrics.plain : ""
-          color: root.foreground
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.body
-          wrapMode: Text.WordWrap
-        }
+    Text {
+      width: parent.width
+      visible: root.status === "error"
+      text: root.errorText || "Could not load lyrics."
+      color: Theme.Color.urgent
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.body
+      wrapMode: Text.WordWrap
+    }
 
-        Text {
-          width: parent.width
-          text: "Unsynced lyrics"
-          color: root.muted
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
-        }
-      }
-
-      // Synced lines
-      Repeater {
-        model: root.syncedView ? root.lines : []
-
-        Item {
-          required property var modelData
-          required property int index
-          width: flickable.width
-          height: root.rowHeight
-
-          Text {
-            anchors.verticalCenter: parent.verticalCenter
-            width: parent.width
-            text: modelData.text !== "" ? modelData.text : "♪"
-            color: index === root.activeIndex ? root.accent
-              : (index < root.activeIndex ? root.foreground : root.muted)
-            font.family: root.fontFamily
-            font.pixelSize: index === root.activeIndex
-              ? Style.font.subtitle : Style.font.body
-            font.bold: index === root.activeIndex
-            opacity: index === root.activeIndex ? 1 : 0.85
-            wrapMode: Text.WordWrap
-            elide: Text.ElideRight
-            Behavior on color { ColorAnimation { duration: Style.duration(150) } }
-          }
-
-          MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.seekRequested(modelData.time)
-          }
-        }
-      }
+    Button {
+      visible: root.status === "error"
+      text: "Try again"
+      iconText: "󰑐"
+      foreground: root.foreground
+      onClicked: root.retryRequested()
     }
   }
 }
