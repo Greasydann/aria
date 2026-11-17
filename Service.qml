@@ -257,6 +257,7 @@ Item {
   property string lyricsStatus: "" // "", "loading", "found", "plain", "instrumental", "notfound", "error"
   property string lyricsError: ""
   property string lyricsLoadedTrackId: ""
+  property var lyricsFailedTracks: ({})
   property var lyricsRequest: null
   property int lyricsRequestSerial: 0
   property var xhrFactory: function() { return new XMLHttpRequest() }
@@ -895,19 +896,18 @@ Item {
     // view for a tick; a genuine track change re-fetches on its own.
     if (!song) return
     var trackId = String(currentTrackId)
-    if (!force && lyricsLoadedTrackId === trackId) return
-    var cached = lyricsCache[trackId]
-    if (cached && !force) {
-      lyricsLoadedTrackId = trackId
-      adoptLyrics(cached, lyricsStatusFor(cached))
-      return
-    }
+    // Skip only when this track's lyrics are the ones already on screen.
+    // The loaded-id marker alone is not enough: between plays other tracks
+    // replace the view, and re-selecting a track must re-fetch.
+    if (!force && lyricsLoadedTrackId === trackId
+        && activeLyrics && activeLyrics.trackId === trackId) return
+    // Tracks known to have no lyrics are not re-requested every tick.
+    if (!force && lyricsFailedTracks[trackId] === true) return
     lyricsLoadedTrackId = trackId
-    var serial = ++lyricsRequestSerial
     activeLyrics = null
     lyricsStatus = "loading"
     lyricsError = ""
-    lyricsLookupRequest(song, trackId, serial, true)
+    lyricsLookupRequest(song, trackId, ++lyricsRequestSerial, true)
   }
 
   function lyricsLookupRequest(song, trackId, serial, exact) {
@@ -935,6 +935,7 @@ Item {
         if (lyricsLoadedTrackId === trackId) {
           activeLyrics = null
           lyricsStatus = "notfound"
+          lyricsFailedTracks[trackId] = true
         }
         return
       }
@@ -943,6 +944,7 @@ Item {
         if (lyricsLoadedTrackId === trackId) {
           activeLyrics = null
           lyricsStatus = "notfound"
+          lyricsFailedTracks[trackId] = true
         }
         return
       }
@@ -3869,6 +3871,7 @@ Item {
     playlists = []
     playlistsLoaded = false
     playlistsNext = ""
+    lyricsFailedTracks = ({})
     savedTracks = []
     savedTracksLoaded = false
     savedTracksNext = ""
