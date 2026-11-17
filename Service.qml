@@ -890,12 +890,10 @@ Item {
 
   function fetchLyrics(force) {
     var song = currentLyricsSong
-    if (!song) {
-      activeLyrics = null
-      lyricsStatus = ""
-      lyricsLoadedTrackId = ""
-      return
-    }
+    // Some Soloist state polls arrive with incomplete metadata (no song
+    // title). Keep the current lyrics on screen instead of blanking the
+    // view for a tick; a genuine track change re-fetches on its own.
+    if (!song) return
     var trackId = String(currentTrackId)
     if (!force && lyricsLoadedTrackId === trackId) return
     var cached = lyricsCache[trackId]
