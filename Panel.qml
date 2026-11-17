@@ -4048,6 +4048,7 @@ Item {
                 accent: root.accent
                 fontFamily: root.fontFamily
                 positionSeconds: root.service ? root.service.positionSeconds : 0
+                playing: root.service ? root.service.playing : true
                 onSeekRequested: function(seconds) {
                   if (root.service) root.service.seekSeconds(seconds)
                 }
