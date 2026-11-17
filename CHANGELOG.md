@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.0 (2026-11-17) — Aria
+
+- First Aria release. Aria is a fork of Omarchy Spotify, renamed and reshaped
+  around a Soloist-first playback design: the embedded playback engine and the
+  official Spotify desktop app are never started or targeted; audio plays on
+  the user's Soloist receiver through Spotify Connect.
+- One browser pairing login for library, search, playlists and playback, kept
+  in a permission-restricted file instead of GNOME Keyring.
+- Optional full-scope login (Spotify app client ID) for the For you page:
+  recently played, top songs and top artists.
+- Playback controls, media keys and the `aria.player` IPC target route through
+  Soloist directly, with device-list resolution that tolerates Spotify Connect
+  registration blinks.
+- Soloist's login watchdog and network-aware launcher make the receiver
+  available within seconds of a reboot.
+
 ## 1.1.0 (2026-11-13)
 
 - Replace mandatory personal Developer apps and separate playback grants with

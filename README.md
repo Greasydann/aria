@@ -2,9 +2,9 @@
 
 **Spotify in Quickshell—not Chromium.**
 
-Aria brings the Spotify experience you already know into a fast,
-beautiful Omarchy plugin. It uses about **60 MB of RAM** instead of roughly
-**950 MB** for the Spotify desktop client, follows your active Omarchy theme,
+Aria brings the Spotify experience you already know into a fast, beautiful
+Omarchy plugin. It idles around **60 MB of RAM** instead of the roughly
+**950 MB** the Spotify desktop client uses, follows your active Omarchy theme,
 and keeps your music close with an integrated mini player.
 
 Pair it with **Omasing** and lyrics for the song you are playing are fetched
@@ -13,10 +13,11 @@ for you, ready when you want them.
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/stappmus/Omarchy-Spotify.git --enable
+omarchy plugin add <repo-url>/aria.git --enable
 ```
 
-Requires Omarchy 4 and a personal Spotify Premium account.
+Requires Omarchy 4, a personal Spotify Premium account, and
+[Soloist](#soloist-local-playback) for playback on this computer.
 
 ## Why you will love it
 
@@ -60,147 +61,101 @@ too.
 | `Ctrl+/` | See every keyboard shortcut |
 | `Ctrl+H` | Hide visible shortcut hints |
 
-The first shortcut, Tab, or opening the player from the keyboard lights
-matching controls with the next key. Hold Ctrl, Shift, or Alt to see those
-chords; the matching hints remain until you release the held modifiers. While
-hints are visible, the header keeps a **Ctrl+H · Hide hints** action in reach.
-It turns hints off until you enable them again in Settings.
+## Log in with Spotify
 
-The mini-player takes keyboard focus when it is opened from a shortcut. Use
-`Tab` or the arrow keys to select every control, `Enter` to activate buttons,
-left/right to adjust a selected slider, and `Esc` to close. The playback
-shortcuts above work there too; `Ctrl+S` toggles shuffle, `Ctrl+R` cycles
-repeat, `Ctrl+Shift+L` opens lyrics, `Ctrl+Shift+A` and `Ctrl+Shift+B` open the
-current artist or album in the full player, and `O` expands the full player.
+Click the Spotify icon on the left side of the bar and choose **Log in**.
+Sign-in finishes on Spotify's own website; if Spotify asks for a code, it is
+shown in the player. The same login connects your library, search, and
+playlists, and is remembered across restarts. Your password is entered only on
+Spotify's own page—Aria never sees it, and your session is stored in a
+permission-restricted file, not a keyring.
 
-## See it in action
+No Developer app, client ID, client secret, or callback URL is needed for this
+login. A client ID is only required for one optional feature (see
+[For you](#for-you)).
 
-### Your playlists, instantly familiar
+## Soloist: local playback
 
-Everything is where you expect it to be—just faster, lighter, and dressed in
-your Omarchy theme.
+Aria routes playback on this computer through **Soloist**, a headless Spotify
+Connect player. Your music plays through Spotify's own Connect service to a
+receiver named **Aria**—the same way a Sonos or a phone would appear—with
+Aria controlling it.
 
-### Everything from an artist, in one view
+1. Install Soloist so `~/.local/bin/soloist` exists.
+2. Create `~/.config/soloist/env` with your developer API key:
+   `SOLOIST_API_KEY=<your key>`
+3. Start it once and pair from any Spotify app:
 
-Top albums and EPs sit beside the artist's ten biggest songs, with their
-**This Is** playlist and full catalog only a search away.
+   ```bash
+   ~/.config/soloist/launch.sh --pair
+   ```
 
-### Lyrics, already matched to the song
+   The launcher waits for the network, starts Soloist with the device name
+   **Aria**, and waits for you to pick **Aria** in your Spotify app's device
+   list.
+4. Run it as a user service so it is always available:
 
-One click sends the current track to Omasing, where the lyrics are fetched and
-lined up with your playback position—ready to auto-scroll as you listen.
+   ```ini
+   # ~/.config/systemd/user/soloist.service
+   [Unit]
+   Description=Aria Spotify playback receiver
 
-### A mini player that belongs in your desktop
+   [Service]
+   ExecStart=%h/.config/soloist/launch.sh
 
-The essentials are always one click away, without reopening the full app.
+   [Install]
+   WantedBy=default.target
+   ```
 
-## Set it up
+   ```bash
+   systemctl --user daemon-reload
+   systemctl --user enable --now soloist.service
+   ```
 
-To replace Omarchy's existing **Super+Shift+M · Music** binding, add this to
+Aria's Settings page can also start and stop this receiver, and the device
+picker shows every Spotify Connect speaker you own, so you can send the music
+to another room's speaker from the same player.
+
+## Keybindings
+
+To give the **Super+Shift+M · Music** shortcut to Aria, add this to
 `~/.config/hypr/bindings.lua`:
 
 ```lua
-  hl.unbind("SUPER + SHIFT + M") -- previously: Music
-  o.bind("SUPER + SHIFT + M", "Omarchy Spotify",
-    "omarchy shell -q quickshell.spotify.player togglePlayer")
+hl.unbind("SUPER + SHIFT + M") -- previously: Music
+o.bind("SUPER + SHIFT + M", "Music (Aria)",
+  "omarchy shell -q aria.player togglePlayer")
 ```
 
-Run `hyprctl reload` and check `hyprctl configerrors` after saving. Until the
-binding is replaced, Omarchy's stock Music binding stays active and the
-Settings choice below has no effect on the shortcut.
-
-In Omarchy Spotify's Settings, choose whether that shortcut launches Omarchy's
-Music app, toggles the full player, or toggles the mini-player. Separate
-bindings can call `toggleMiniPlayer` or `toggleFullPlayer` on the same
-`quickshell.spotify.player` target.
-
-Raise or lower Spotify volume from a keybinding without opening the player:
+Run `hyprctl reload` after saving. In Aria's Settings, choose whether that
+shortcut opens the full player or the mini player. Separate bindings can call
+the same `aria.player` target directly:
 
 ```bash
-omarchy shell -q quickshell.spotify.player volumeUp
-omarchy shell -q quickshell.spotify.player volumeDown
+omarchy shell -q aria.player playPause
+omarchy shell -q aria.player next
+omarchy shell -q aria.player previous
+omarchy shell -q aria.player volumeUp
+omarchy shell -q aria.player volumeDown
 ```
 
-Each step is 5%, the same as Ctrl+Up / Ctrl+Down. This changes Spotify's own
-volume, including speakers, not the computer's output level.
+Volume steps are 5%, the same as Ctrl+Up / Ctrl+Down. These change Spotify's
+own volume—including speakers—not the computer's output level.
 
-Click the Spotify icon on the left side of the bar. The mini-player asks you
-to **Set up and continue**, then Spotify sign-in finishes in your browser. You
-can move the widget later with Omarchy's bar controls.
+## For you
 
-Local playback installs an exact-version backend only after its GitHub build
-provenance matches this plugin version's tag and the checkout's backend inputs
-still match that tagged source. If verification is unavailable, setup builds
-the locked Rust source locally. The native backend is required for account sign-in;
-setup never reports a playback-only fallback as a complete installation.
+The **For you** page shows your recently played songs and top songs and
+artists. Spotify only serves those through a full-scope user token, so this
+one page asks for a one-time extra login:
 
-## Log in with Spotify
+1. Create a Spotify app in the
+   [developer dashboard](https://developer.spotify.com/dashboard) and add the
+   redirect URI `http://127.0.0.1:8989/login`.
+2. Paste the app's client ID into Aria's Settings.
+3. Open **For you** and choose **Log in with Spotify**.
 
-Choose **Log in with Spotify**, approve the pairing prompt on Spotify's website,
-and return to the player. If Spotify asks for a code, it is shown in the player.
-The same login connects your library, search and local playback, and is remembered
-across restarts. Spotify Premium is required. No Developer app, client ID, client
-secret or callback URL needs to be configured.
-
-The native login and browsing implementation is built from this repository into
-our playback backend. It does not run spotatui or depend on its releases or a
-third-party proxy. It uses Spotify's unofficial native interfaces, which may need
-maintenance when Spotify changes them. Existing playback credentials are reused;
-old Web API keyring entries are left untouched.
-
-Account-wide listening history/top rankings, related artists and audiobooks are
-not currently implemented in the native backend. Unsupported requests return an
-explicit error rather than pretending the account has no items.
-
-After upgrading, restart the Omarchy shell so retained plugin services load the
-new code.
-
-## Remove it completely
-
-Run the bundled uninstaller from outside the plugin directory:
-
-```bash
-cd "$HOME" && "$HOME/.config/omarchy/plugins/quickshell.spotify/scripts/uninstall.sh"
-```
-
-It disables and removes the plugin, stops and removes both user services,
-restarts the shell, and deletes all plugin-owned configuration, cached audio,
-backend build files, installed binaries, playback state, runtime sockets, old
-configuration backups, and matching GNOME Keyring entries.
-
-If you prefer to inspect and paste the main steps individually:
-
-```bash
-plugin_dir="$HOME/.config/omarchy/plugins/quickshell.spotify"
-cd "$HOME"
-omarchy plugin disable quickshell.spotify 2>/dev/null || true
-"$plugin_dir/scripts/remove-runtime.sh" --purge
-omarchy plugin remove quickshell.spotify --yes
-omarchy restart shell
-```
-
-The cleanup deliberately leaves unrelated software alone. A source checkout
-outside Omarchy's plugin directory, separate plugins such as Omasing, and the
-`spotifyd` package remain in place. If this plugin was the only reason you
-installed the fallback package, remove it with:
-
-```bash
-omarchy pkg drop spotifyd
-```
-
-Very old installation instructions may also have added a custom Hyprland
-shortcut. The uninstaller reports any such references without rewriting your
-personal configuration. Check both the live config and, when applicable, its
-chezmoi source:
-
-```bash
-rg -n 'quickshell\.spotify|Omarchy Spotify' \
-  "$HOME/.config/hypr" "$HOME/.local/share/chezmoi" 2>/dev/null
-```
-
-Remove only the matching custom lines, apply the dotfiles change, and run
-`hyprctl reload`. Omarchy's stock **Super+Shift+M** Music shortcut will then be
-used again.
+The refresh token is stored in `~/.local/state/aria/` (mode 600) and renews
+itself; everything else in Aria keeps working without this login.
 
 ## More music, less app
 
@@ -214,14 +169,24 @@ used again.
   keyboard shortcut, use optional spinning vinyl artwork in the mini-player,
   show the title, artist, or both, and softly scroll overflowing text at an
   adjustable speed.
-- Choose up to 320 kbps for local playback.
-
-Your Spotify password is entered only on Spotify's own page. Omarchy Spotify
-stores your saved session in GNOME Keyring and clears it when you log out.
 
 Want the details? Read the [technical notes](docs/TECHNICAL.md).
 
-Omarchy Spotify is an independent project and is not affiliated with Spotify.
-Spotify is a trademark of Spotify AB.
+## Remove it completely
+
+Run the bundled uninstaller from outside the plugin directory:
+
+```bash
+cd "$HOME" && "$HOME/.config/omarchy/plugins/aria/scripts/uninstall.sh"
+```
+
+It disables and removes the plugin, restarts the shell, and deletes
+plugin-owned configuration, cached artwork, and session state. Your Soloist
+installation and service are yours to keep or remove separately.
+
+Aria is an independent project and is not affiliated with Spotify.
+Spotify is a trademark of Spotify AB. Aria is a fork of
+[Omarchy Spotify](https://github.com/stappmus/Omarchy-Spotify) and would not
+exist without it—thank you.
 
 Licensed under the [MIT License](LICENSE).

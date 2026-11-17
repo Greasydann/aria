@@ -6,7 +6,7 @@ install_spotifyd=0
 force_config=0
 require_native=0
 skip_backend_build=${OMARCHY_SPOTIFY_SKIP_BACKEND_BUILD:-0}
-device_name="Omarchy Spotify"
+device_name="Aria"
 
 usage() {
   cat <<'EOF'

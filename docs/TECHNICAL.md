@@ -5,7 +5,7 @@ details out of the user-facing README.
 
 ## Architecture
 
-Omarchy Spotify runs as a plugin inside Omarchy's existing `omarchy-shell`
+Aria runs as a plugin inside Omarchy's existing `omarchy-shell`
 Quickshell process. It provides a shared service, a bar widget, and a lazy-loaded
 panel. There is no embedded website, browser engine, second shell process, or
 resident helper process.
@@ -18,7 +18,7 @@ rate while that device is playing. Fast `/me/player` polling is reserved for
 remote or unknown targets. Spotify data and other user actions also use the
 Web API.
 
-Local audio runs in the plugin-owned `omarchy-spotify-backend` Rust process,
+Local audio runs in the plugin-owned `omarchy-spotify-backend` (Aria's backend) Rust process,
 supervised by a static systemd user unit that is never enabled at login. The
 backend embeds a commit-pinned librespot revision rather than duplicating its
 private-protocol implementation. It owns configuration, cache/authentication,

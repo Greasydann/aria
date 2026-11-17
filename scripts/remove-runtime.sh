@@ -106,9 +106,9 @@ if (( purge )); then
   done
   if command -v secret-tool >/dev/null 2>&1; then
     for _ in {1..100}; do
-      secret-tool clear service quickshell-spotify kind refresh-token >/dev/null 2>&1 || break
+      secret-tool clear service aria kind refresh-token >/dev/null 2>&1 || break
     done
-    echo "Cleared matching Omarchy Spotify keyring entries."
+    echo "Cleared matching Aria keyring entries."
   fi
 else
   rmdir -- "$runtime_dir" 2>/dev/null || true
