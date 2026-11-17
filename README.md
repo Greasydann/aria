@@ -13,7 +13,7 @@ for you, ready when you want them.
 ## Install
 
 ```bash
-omarchy plugin add <repo-url>/aria.git --enable
+omarchy plugin add https://github.com/Greasydann/aria.git --enable
 ```
 
 Requires Omarchy 4, a personal Spotify Premium account, and
