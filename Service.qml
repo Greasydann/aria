@@ -38,7 +38,6 @@ Item {
 
   readonly property var defaultSettingValues: ({
     deviceName: "Aria",
-    idleShutdownMinutes: 15,
     showMiniPlayer: "On",
     showVinylRecord: "Off",
     shortcutPlayer: "Omarchy Music app",
@@ -179,8 +178,6 @@ Item {
     return null
   }
 
-  readonly property int idleShutdownMinutes: Math.max(0, Math.min(1440,
-    Math.floor(Number(settings.idleShutdownMinutes) || 0)))
   readonly property bool showMiniPlayer: String(settings.showMiniPlayer || "On") !== "Off"
   readonly property bool showVinylRecord: String(settings.showVinylRecord || "Off") === "On"
   readonly property string shortcutPlayer: Api.normalizedShortcutPlayer(
@@ -200,12 +197,6 @@ Item {
   // between songs of different lengths. Meaningless without a cap.
   readonly property bool fixedBarWidth: maxBarTextWidth > 0
     && String(settings.fixedBarWidth || "Off") === "On"
-  readonly property int bitrateKbps: {
-    var quality = String(settings.audioQuality || "320 kbps")
-    return quality.indexOf("96") === 0 ? 96
-      : (quality.indexOf("160") === 0 ? 160 : 320)
-  }
-  readonly property string audioQuality: bitrateKbps + " kbps"
   property var searchHistory: []
   property var sessionState: ({})
   property bool sessionFileReady: false
@@ -215,17 +206,11 @@ Item {
 
   readonly property alias auth: authManager
   readonly property alias api: spotifyApi
-  readonly property alias daemon: daemonManager
-  readonly property alias backend: backendClient
   readonly property bool accountConnected: authManager.loggedIn
   readonly property bool sessionPending: !authManager.sessionChecked
-  readonly property bool fullyConnected: daemonManager.playbackReady
-    && authManager.loggedIn && daemonManager.credentialsAvailable
-  readonly property bool loginBusy: daemonManager.setupBusy
-    || authManager.loginBusy
+  readonly property bool fullyConnected: authManager.loggedIn
+  readonly property bool loginBusy: authManager.loginBusy
     || authManager.sessionBusy || !authManager.sessionChecked
-    || daemonManager.authenticationBusy || daemonManager.credentialsClearBusy
-    || !daemonManager.credentialsChecked || !daemonManager.requirementsChecked
   readonly property string loginProgress: loginProgressText()
 
   readonly property var mprisPlayers: Mpris.players ? Mpris.players.values : []
@@ -604,7 +589,6 @@ Item {
   // keeps playing; this snapshot keeps its routable id available.
   property var soloistConnectSnapshot: null
   property int officialSpotifyLaunchWaitAttempts: 0
-  property int localSocketWaitAttempts: 0
   property int visibleLocalDeviceRefreshAttempts: 0
   property bool loginFlowActive: false
   property string pendingConnectDeviceId: ""
@@ -622,17 +606,11 @@ Item {
   signal lyricsPluginOpened(string surface)
 
   function loginProgressText() {
-    if (daemonManager.setupBusy) return "Preparing playback on this computer"
-    if (daemonManager.credentialsClearBusy) return "Signing out"
     if (authManager.loginBusy) return authManager.pairingCode
       ? "Enter " + authManager.pairingCode + " on Spotify" : "Opening Spotify sign-in"
     if (!settingsReady) return "Waiting for Spotify settings"
     if (authManager.sessionBusy || !authManager.sessionChecked)
       return "Checking your saved Spotify session"
-    if (!daemonManager.requirementsChecked || !daemonManager.credentialsChecked)
-      return "Checking local playback"
-    if (daemonManager.authenticationBusy)
-      return "Approve local playback in your browser"
     return fullyConnected ? "Connected to Spotify" : "Ready to connect"
   }
 
@@ -646,17 +624,15 @@ Item {
   function normalizedSettings(values) {
     var next = defaults()
     var source = values || {}
-    var keys = ["deviceName", "idleShutdownMinutes", "showMiniPlayer",
+    var keys = ["deviceName", "showMiniPlayer",
       "showVinylRecord", "shortcutPlayer", "shortcutHints", "showLyrics", "showArtwork", "showTrackTitle", "showArtistName",
       "showPausedTrack", "scrollBarText", "scrollSpeed", "maxBarTextWidth",
-      "fixedBarWidth", "audioQuality", "clientId"]
+      "fixedBarWidth", "clientId"]
     for (var i = 0; i < keys.length; i++) {
       var key = keys[i]
       if (source[key] !== undefined) next[key] = source[key]
     }
     next.deviceName = String(next.deviceName || "Aria").trim() || "Aria"
-    next.idleShutdownMinutes = Math.max(0, Math.min(1440,
-      Math.floor(Number(next.idleShutdownMinutes) || 0)))
     next.showMiniPlayer = String(next.showMiniPlayer || "On") === "Off" ? "Off" : "On"
     next.showVinylRecord = String(next.showVinylRecord || "Off") === "On" ? "On" : "Off"
     next.shortcutPlayer = Api.normalizedShortcutPlayer(next.shortcutPlayer)
@@ -713,8 +689,6 @@ Item {
     var next = normalizedSettings(values)
     if (JSON.stringify(next) !== JSON.stringify(settings)) settings = next
     if (previousDeviceName !== next.deviceName) {
-      if (daemonManager.running && !localRuntimeDeviceName)
-        localRuntimeDeviceName = previousDeviceName
       apiDevices = relabelLocalDevices(apiDevices, previousDeviceName, next.deviceName)
       devices = relabelLocalDevices(devices, previousDeviceName, next.deviceName)
     }
@@ -1682,7 +1656,6 @@ Item {
 
   // Retry a saved native session when a Spotify surface is opened.
   function activate(view) {
-    if (daemonManager.credentialsClearBusy) return
     if (!authManager.loggedIn && authManager.sessionChecked) authManager.restoreSession()
     activeView = normalizedView(view)
     authManager.withAccessToken(function(token, error) {
@@ -3374,152 +3347,8 @@ Item {
       return
     }
 
-    if (!daemonManager.credentialsChecked && (!target || target.local)) {
-      fail("Local playback credentials are still being checked. Try again shortly.")
-      clearPendingPlayback()
-      return
-    }
-    if (!daemonManager.credentialsAvailable && (!target || target.local)) {
-      fail("Approve playback on this computer in Settings, then try again")
-      clearPendingPlayback()
-      return
-    }
-    if (!daemonManager.usingFallbackRuntime
-        && (backendClient.ready || daemonManager.playbackReady)) {
-      waitForLocalSocketThenPlay(playbackSerial)
-      return
-    }
-    if (target && target.local && daemonManager.running) {
-      localActivationRequested = false
-      sendPendingPlayback(Api.playbackTargetDeviceId(target, selectedDeviceExplicit))
-      return
-    }
-    if (!daemonManager.binaryAvailable || !daemonManager.unitAvailable) {
-      fail("Playback on this computer needs to be set up in Settings")
-      clearPendingPlayback()
-      return
-    }
     fail("Soloist (Aria) is not available as a playback device. Make sure it is running and logged in, then try again")
     clearPendingPlayback()
-  }
-
-  function waitForLocalSocketThenPlay(playbackSerial) {
-    if (playbackSerial !== pendingPlaybackSerial || !pendingPlaybackBody) return
-    if (backendClient.ready) {
-      sendLocalSocketPlayback(playbackSerial)
-      return
-    }
-    if (!daemonManager.binaryAvailable || !daemonManager.unitAvailable) {
-      fail("Playback on this computer needs to be set up in Settings")
-      clearPendingPlayback()
-      return
-    }
-    // daemon start disabled for Aria
-    localSocketWaitAttempts = 0
-    localSocketWaitTimer.restart()
-  }
-
-  function sendLocalSocketPlayback(playbackSerial) {
-    if (playbackSerial !== pendingPlaybackSerial || !pendingPlaybackBody) return
-    var body = pendingPlaybackBody
-    var successMessage = pendingPlaybackMessage
-    var radioPlaylist = pendingPlaybackRadio
-    clearPendingPlayback()
-    localSocketWaitTimer.stop()
-    backendClient.loadPlayback(body, function(ok, result, error) {
-      if (ok) {
-        if (playbackSerial === root.radioSerial)
-          root.radioContextSelected = !!radioPlaylist
-        if (successMessage) root.succeed(successMessage)
-        root.loadQueue()
-        root.loadPlaybackState()
-        return
-      }
-      root.pendingPlaybackBody = body
-      root.pendingPlaybackMessage = successMessage
-      root.pendingPlaybackRadio = radioPlaylist
-      root.pendingPlaybackSerial = playbackSerial
-      root.succeed(Api.localSocketFallbackMessage())
-      root.sendPendingPlayback(Api.playbackTargetDeviceId(
-        root.localDevice() || root.chooseDevice(), root.selectedDeviceExplicit))
-    })
-  }
-
-  function playItem(item, sourceItems, contextUri, successMessage, explicitRadio) {
-    localPlaybackStopped = false
-    var playbackSerial = ++radioSerial
-    var body = Api.playbackBody(item, sourceItems, contextUri)
-    if (!body) {
-      fail("This Spotify item cannot be played")
-      return
-    }
-    pendingPlayback = item
-    pendingPlaybackBody = body
-    pendingPlaybackMessage = String(successMessage || "")
-    pendingPlaybackRadio = radioPlaylistForPlayback(item, contextUri, explicitRadio)
-    pendingPlaybackSerial = playbackSerial
-    localActivationRequested = true
-    deviceProbeAttempts = 0
-    noteActivity()
-
-    // Opening the panel refreshes current playback asynchronously. Wait for
-    // that in-flight result before choosing the local fallback, otherwise a
-    // fast click can race the refresh and move playback off the active device.
-    if (!selectedDeviceExplicit && remotePlaybackLoading) {
-      loadPlaybackState(function() {
-        root.dispatchPendingPlayback(playbackSerial)
-      })
-      return
-    }
-    dispatchPendingPlayback(playbackSerial)
-  }
-
-  function probeForLocalDevice() {
-    if (!pendingPlayback && !localActivationRequested) return
-    loadDevices(function() {
-      if (!root.pendingPlayback && !root.localActivationRequested) return
-      var soloist = root.soloistDevice()
-      var soloistId = soloist ? root.playbackTargetId(soloist.id) : ""
-      if (soloistId) {
-        root.localActivationRequested = false
-        root.deviceProbeAttempts = 0
-        if (root.pendingPlayback)
-          root.sendPendingPlayback(soloistId)
-        return
-      }
-      var target = root.pendingPlayback
-        ? (root.autoselectLocalDevice() || root.chooseDevice()) : null
-      if (target && !target.local) {
-        root.localActivationRequested = false
-        root.sendPendingPlayback(Api.playbackTargetDeviceId(
-          target, root.selectedDeviceExplicit))
-        return
-      }
-      // Soloist-only: never fall back to the official app or the embedded
-      // omarchy-spotify backend device for audio.
-      root.deviceProbeAttempts++
-      if (root.deviceProbeAttempts < 20) {
-        deviceProbeTimer.restart()
-      } else {
-        root.clearPendingPlayback()
-        root.fail("Soloist (Aria) is not available as a playback device. Make sure it is running and logged in, then try again")
-      }
-    })
-  }
-
-  function activateLocalDevice(deviceId) {
-    var id = String(deviceId || "")
-    if (!id) return
-    localActivationRequested = false
-    apiAction("PUT", "/me/player", null,
-      { device_ids: [id], play: false }, "Omarchy Spotify is ready",
-      function(ok) {
-        if (ok) {
-          root.selectedDeviceId = id
-          root.selectedDeviceExplicit = false
-          root.loadDevices()
-        }
-      })
   }
 
   function sendPendingPlayback(deviceIdInput) {
@@ -3982,16 +3811,6 @@ Item {
       fail("Only tracks and episodes can be added to the queue")
       return
     }
-    if (!useRemotePlayback && backendClient.ready) {
-      backendClient.sendCommand("add_to_queue", { uri: item.uri },
-        function(ok, result, error) {
-          if (ok) {
-            root.succeed("Added to queue")
-            root.loadQueue()
-          } else root.fail(error || "Could not add that item to the queue")
-        })
-      return
-    }
     apiAction("POST", "/me/player/queue", {
       uri: item.uri,
       device_id: controlDeviceId() || undefined
@@ -4008,7 +3827,6 @@ Item {
       deviceProbeTimer.restart()
       return
     }
-    // daemonManager.start(true) disabled for Aria (Soloist-only)
     deviceProbeTimer.restart()
   }
 
@@ -4017,40 +3835,19 @@ Item {
     cancelVisibleLocalDeviceRefresh()
     clearPendingPlayback()
     deviceProbeTimer.stop()
-    localSocketWaitTimer.stop()
-    localSocketWaitAttempts = 0
-    daemonManager.stop()
   }
 
   function login() {
-    if (authManager.loginBusy || authManager.sessionBusy
-        || daemonManager.setupBusy || daemonManager.authenticationBusy) return
+    if (authManager.loginBusy || authManager.sessionBusy) return
     noteActivity()
     lastError = ""
     statusClearTimer.stop()
     statusMessage = ""
     loginFlowActive = true
-    if (!daemonManager.playbackReady || daemonManager.usingFallbackRuntime) {
-      daemonManager.setupPlayback()
-      return
-    }
     if (!authManager.loggedIn) {
       authManager.beginLogin()
       return
     }
-    continueLocalPlaybackSetup()
-  }
-
-  function continueLocalPlaybackSetup() {
-    if (!daemonManager.playbackReady) {
-      daemonManager.setupPlayback()
-      return
-    }
-    if (!authManager.loggedIn) {
-      authManager.beginLogin()
-      return
-    }
-    daemonManager.checkCredentials()
     finishLoginFlow()
   }
 
@@ -4059,7 +3856,6 @@ Item {
     lastError = ""
     statusMessage = ""
     authManager.cancelLogin()
-    daemonManager.cancelAuthentication()
   }
 
   function reconnectAccount() {
@@ -4082,13 +3878,12 @@ Item {
   }
 
   function logout() {
-    if (loginBusy || daemonManager.busy) return
+    if (loginBusy) return
     loginFlowActive = false
     dataSerial++
     clearPendingPlayback()
     deviceProbeTimer.stop()
     spotifyApi.cancelSearch()
-    daemonManager.clearCredentials()
     authManager.logout()
     clearData()
   }
@@ -4215,8 +4010,6 @@ Item {
     deviceLoadWaiters = []
     pendingDeviceDiscover = false
     searchLoading = false
-    localSocketWaitAttempts = 0
-    localSocketWaitTimer.stop()
     cancelSleepTimer(false)
   }
 
@@ -4251,7 +4044,6 @@ Item {
     ensureStateDir.running = true
     settingsSync.start()
     refreshLyricsHostState()
-    daemonManager.refreshStatus()
   }
 
   Connections {
@@ -4265,7 +4057,6 @@ Item {
     target: authManager
     function onLoginSucceeded() {
       root.syncCurrentTrackSaved(true)
-      daemonManager.checkCredentials()
       root.finishLoginFlow()
       if (root.uiVisible) root.ensureVisibleLocalReceiver()
       if (root.localActivationRequested) deviceProbeTimer.restart()
@@ -4292,42 +4083,6 @@ Item {
     function onLoggedOut() {
       root.homeLoaded = false
     }
-  }
-
-  Connections {
-    target: daemonManager
-    function onCredentialsAvailableChanged() {
-      if (daemonManager.credentialsAvailable && root.uiVisible)
-        root.ensureVisibleLocalReceiver()
-    }
-    function onSetupSucceeded() {
-      if (root.loginFlowActive) root.continueLocalPlaybackSetup()
-      else root.succeed("Playback on this computer is ready")
-    }
-    function onSetupFailed(reason) {
-      root.loginFlowActive = false
-      root.fail(reason)
-    }
-    function onStarted() {
-      root.localRuntimeDeviceName = root.deviceName
-      root.localDeviceId = ""
-      root.succeed("Playback started on this computer")
-      if (root.uiVisible) root.ensureVisibleLocalReceiver()
-      if (root.pendingPlayback || root.localActivationRequested) deviceProbeTimer.restart()
-    }
-    function onStopped() { root.succeed("Playback stopped on this computer") }
-    function onAuthenticationSucceeded() {
-      if (root.loginFlowActive) root.finishLoginFlow()
-      else root.succeed("Playback on this computer is connected")
-      if (root.uiVisible) root.ensureVisibleLocalReceiver()
-      if (root.pendingPlayback || root.localActivationRequested) deviceProbeTimer.restart()
-    }
-    function onAuthenticationFailed(reason) {
-      root.loginFlowActive = false
-      root.fail(reason)
-    }
-    function onCredentialsCleared() { root.succeed("Signed out of Spotify") }
-    function onCredentialsClearFailed(reason) { root.fail(reason) }
   }
 
   Connections {
@@ -4567,29 +4322,6 @@ Item {
   }
 
   Timer {
-    id: localSocketWaitTimer
-    interval: 200
-    repeat: true
-    onTriggered: {
-      if (root.backend.ready && root.pendingPlaybackBody) {
-        stop()
-        root.localSocketWaitAttempts = 0
-        root.sendLocalSocketPlayback(root.pendingPlaybackSerial)
-        return
-      }
-      root.localSocketWaitAttempts++
-      if (root.localSocketWaitAttempts >= 25) {
-        stop()
-        root.localSocketWaitAttempts = 0
-        if (root.pendingPlaybackBody) {
-          root.succeed(Api.localSocketFallbackMessage())
-          deviceProbeTimer.restart()
-        }
-      }
-    }
-  }
-
-  Timer {
     id: sonosControlRefreshTimer
     interval: 650
     repeat: false
@@ -4620,18 +4352,6 @@ Item {
     interval: 200
     repeat: true
     onTriggered: root.reconcilePendingSliderVolume()
-  }
-
-  Timer {
-    id: idleTimer
-    interval: 60000
-    repeat: true
-    running: Api.idleShutdownShouldRun(root.daemon.running, root.hasMedia,
-      root.uiVisible, root.idleShutdownMinutes)
-    onTriggered: {
-      if (Date.now() - root.lastActivityAt >= root.idleShutdownMinutes * 60000)
-        root.stopEngine()
-    }
   }
 
   Timer {
@@ -4668,9 +4388,9 @@ Item {
   NativeSession {
     id: authManager
     pluginDir: root.pluginDir
-    // Aria keeps the native login/browsing session, but playback audio is
-    // routed to Soloist; the embedded playback engine stays off.
-    enabled: daemonManager.playbackReady && !daemonManager.usingFallbackRuntime
+    // Login and browsing always run through the backend session; playback
+    // audio is routed to Soloist.
+    enabled: true
   }
 
   SpotifyApi {
@@ -4693,22 +4413,6 @@ Item {
   SpotifyConnectManager {
     id: spotifyConnectManager
     pluginDir: root.pluginDir
-  }
-
-  DaemonManager {
-    id: daemonManager
-    pluginDir: root.pluginDir
-    deviceName: root.deviceName
-    bitrateKbps: root.bitrateKbps
-    mprisPresent: root.hasLocalPlayer
-  }
-
-  BackendClient {
-    id: backendClient
-    // Aria uses Soloist for local playback; keep embedded backend client disabled.
-    wanted: false
-    onErrorCodeChanged: if (errorCode === "audio_key_unavailable")
-      root.fail(errorMessage || "Spotify could not play this track on this computer")
   }
 
   Process {

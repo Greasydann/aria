@@ -216,11 +216,7 @@ The suite runs Omarchy manifest validation, Qt 6 QML lint, offline Qt tests with
 mocked authentication responses, shell-script tests, configuration checks, and a
 forbidden-heavyweight-dependency scan.
 
-Resource sampling:
-
 ```bash
-./scripts/benchmark.sh idle 10
-```
 
 ## Complete removal
 

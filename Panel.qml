@@ -302,35 +302,23 @@ Item {
     if (!service) return "Spotify unavailable"
     if (service.loginBusy) return service.loginProgress + "…"
     if (fullyConnected) return "Connected"
-    if (accountConnected && !service.daemon.playbackReady)
-      return "Set up playback"
-    if (accountConnected) return "Finish playback setup"
-    if (!service.daemon.playbackReady) return "Set up and continue"
     return "Log in with Spotify"
   }
 
   function connectionHeadline() {
     if (!service) return "Spotify is unavailable"
-    if (service.daemon.setupBusy) return "Setting up playback"
     if (fullyConnected) return "You're connected"
     if (accountConnected) return "Account connected"
-    if (!service.daemon.playbackReady) return "One quick setup, then Spotify"
     return "Log in with Spotify"
   }
 
   function connectionErrorText() {
     if (!service) return "Aria is unavailable"
-    return service.lastError || service.auth.lastError || service.daemon.lastError
+    return service.lastError || service.auth.lastError
   }
 
   function playbackStatusText() {
     if (!service) return "Playback is unavailable"
-    if (!service.daemon.requirementsChecked) return "Checking playback support…"
-    if (service.daemon.setupBusy) return "Preparing playback on this computer…"
-    if (!service.daemon.playbackReady) return "A quick one-time setup is needed"
-    if (!service.daemon.credentialsChecked) return "Checking your Spotify connection…"
-    if (!service.daemon.credentialsAvailable) return "Ready for Spotify sign-in"
-    if (service.daemon.running) return "Active on this computer"
     return "Ready — starts automatically when you play music"
   }
 
@@ -6016,18 +6004,6 @@ Item {
             }
           }
 
-          Button {
-            text: "Stop playback on this computer"
-            iconText: "󰓛"
-            foreground: root.foreground
-            visible: root.service && root.service.daemon.running
-            enabled: root.service && !root.service.daemon.busy
-            onClicked: root.service.stopEngine()
-          }
-
-          // No "Start this computer" button: Spoty's playback target is the
-          // Soloist receiver alone, and starting the embedded engine here
-          // would fight it.
 
           Text {
             width: parent.width
@@ -6276,7 +6252,7 @@ Item {
 
               Text {
                 width: parent.width
-                text: "Two short steps. First connect your Spotify account so you can browse. Then approve playback on this computer if you want to listen here."
+                text: "One short step: connect your Spotify account to browse your library, playlists and playback."
                 color: root.muted
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body
@@ -6308,26 +6284,6 @@ Item {
                   }
                 }
 
-                Row {
-                  spacing: Style.space(7)
-                  Text {
-                    text: root.service && root.service.daemon.credentialsAvailable ? "󰄬" : "󰓃"
-                    color: root.service && root.service.daemon.credentialsAvailable
-                      ? root.accent : root.muted
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                  }
-                  Text {
-                    text: root.service && root.service.daemon.credentialsAvailable
-                      ? "Playback on this computer is connected"
-                      : (root.service && root.service.daemon.authenticationBusy
-                        ? "Connecting playback on this computer…"
-                        : "Playback on this computer")
-                    color: root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.bodySmall
-                  }
-                }
               }
 
               Text {
@@ -6373,20 +6329,6 @@ Item {
                   visible: root.service && root.service.loginBusy
                   onClicked: if (root.service) root.service.cancelLogin()
                 }
-              }
-
-              Text {
-                width: parent.width
-                text: !root.service || root.service.daemon.playbackReady
-                  || root.service.daemon.setupBusy ? ""
-                  : (root.service.daemon.binaryAvailable
-                    ? "This prepares private, on-demand playback for your account."
-                    : "Omarchy may ask for your computer password to install its small playback component.")
-                color: root.muted
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-                wrapMode: Text.WordWrap
-                visible: text !== ""
               }
 
               Text {
@@ -6471,10 +6413,8 @@ Item {
                   : (root.service.loginBusy ? root.service.loginProgress + "…"
                   : (root.fullyConnected ? "Connected and ready to play"
                   : (root.service.auth.loggedIn
-                    ? "Spotify is connected · preparing playback"
-                    : (root.service.daemon.credentialsAvailable
-                      ? "Restoring your Spotify session"
-                      : "Not connected"))))
+                    ? "Spotify is connected"
+                    : "Not connected")))
                 color: root.fullyConnected ? root.accent : root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body
@@ -6515,10 +6455,8 @@ Item {
                 text: "Log out"
                 iconText: "󰍃"
                 foreground: root.foreground
-                visible: root.service && (root.service.auth.loggedIn
-                  || root.service.daemon.credentialsAvailable)
+                visible: root.service && root.service.auth.loggedIn
                 enabled: root.service && !root.service.loginBusy
-                  && !root.service.daemon.busy
                 onClicked: root.service.logout()
               }
             }
@@ -6535,67 +6473,6 @@ Item {
           }
 
           PanelSeparator { foreground: root.foreground }
-
-          Column {
-            id: localPlaybackSetup
-            width: parent.width
-            spacing: Style.space(7)
-            visible: root.service && !root.service.daemon.playbackReady
-
-            Text {
-              text: "PLAYBACK ON THIS COMPUTER"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-            }
-            Text {
-              width: parent.width
-              text: "A lightweight background player starts only when you need it, works with Omarchy's media controls, and appears in Spotify Connect as this computer."
-              color: root.muted
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              wrapMode: Text.WordWrap
-            }
-
-            BorderSurface {
-              width: parent.width
-              implicitHeight: engineStatus.implicitHeight + Style.space(16)
-              color: Style.normalFillFor(root.foreground, root.accent)
-              borderSpec: Border.controlSpec("normal", root.foreground, root.accent)
-              radius: Style.cornerRadius
-
-              Text {
-                id: engineStatus
-                anchors.fill: parent
-                anchors.margins: Style.space(8)
-                text: root.playbackStatusText()
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.body
-                wrapMode: Text.WordWrap
-              }
-            }
-
-            Row {
-              spacing: Style.space(7)
-
-              Button {
-                text: root.service && root.service.daemon.setupBusy
-                  ? "Setting up playback…" : "Set up playback"
-                iconText: "󰓃"
-                foreground: root.foreground
-                visible: root.service && !root.service.daemon.playbackReady
-                enabled: root.service && !root.service.loginBusy
-                onClicked: root.service.login()
-              }
-            }
-          }
-
-          PanelSeparator {
-            foreground: root.foreground
-            visible: localPlaybackSetup.visible
-          }
 
           Column {
             width: parent.width
