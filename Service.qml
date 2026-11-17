@@ -3266,6 +3266,35 @@ Item {
     })
   }
 
+  function playItem(item, sourceItems, contextUri, successMessage, explicitRadio) {
+    localPlaybackStopped = false
+    var playbackSerial = ++radioSerial
+    var body = Api.playbackBody(item, sourceItems, contextUri)
+    if (!body) {
+      fail("This Spotify item cannot be played")
+      return
+    }
+    pendingPlayback = item
+    pendingPlaybackBody = body
+    pendingPlaybackMessage = String(successMessage || "")
+    pendingPlaybackRadio = radioPlaylistForPlayback(item, contextUri, explicitRadio)
+    pendingPlaybackSerial = playbackSerial
+    localActivationRequested = true
+    deviceProbeAttempts = 0
+    noteActivity()
+
+    // Opening the panel refreshes current playback asynchronously. Wait for
+    // that in-flight result before choosing the local fallback, otherwise a
+    // fast click can race the refresh and move playback off the active device.
+    if (!selectedDeviceExplicit && remotePlaybackLoading) {
+      loadPlaybackState(function() {
+        root.dispatchPendingPlayback(playbackSerial)
+      })
+      return
+    }
+    dispatchPendingPlayback(playbackSerial)
+  }
+
   function dispatchPendingPlayback(playbackSerial) {
     if (playbackSerial !== pendingPlaybackSerial || !pendingPlaybackBody) return
     var target = autoselectLocalDevice() || chooseDevice()
