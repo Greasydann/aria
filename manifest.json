@@ -29,7 +29,7 @@
     "allowMultiple": false,
     "defaultSection": "left",
     "defaults": {
-      "deviceName": "Spoty",
+      "deviceName": "Aria",
       "idleShutdownMinutes": 15,
       "showMiniPlayer": "On",
       "showVinylRecord": "Off",
@@ -51,7 +51,7 @@
         "key": "deviceName",
         "type": "string",
         "label": "This computer appears as",
-        "defaultValue": "Omarchy Spotify",
+        "defaultValue": "Aria",
         "description": "Shown in Devices immediately. Spotify Connect uses the new name the next time local playback starts."
       },
       {

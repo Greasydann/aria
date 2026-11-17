@@ -58,9 +58,9 @@ Item {
   property var settings: Api.shallowCopy(defaultSettingValues)
   property bool settingsReady: false
 
-  readonly property string deviceName: String(settings.deviceName || "Spoty").trim() || "Spoty"
-  readonly property string soloistDeviceName: "Spoty"
-  readonly property var soloistDeviceNames: ["Spoty", "Spotty", "SoloistPC", "OmaSpotify (this PC)"]
+  readonly property string deviceName: String(settings.deviceName || "Aria").trim() || "Aria"
+  readonly property string soloistDeviceName: "Aria"
+  readonly property var soloistDeviceNames: ["Aria", "Spoty", "Spotty", "SoloistPC", "OmaSpotify (this PC)"]
 
   readonly property string hostName: String(hostnameReader.text() || "").trim()
   readonly property var officialDesktopNames: ["omarchy", "omarchy spotify", "this computer"]
@@ -443,7 +443,7 @@ Item {
   property string selectedDeviceId: ""
   property bool selectedDeviceExplicit: false
   property string localDeviceId: ""
-  property string localRuntimeDeviceName: "Spoty"
+  property string localRuntimeDeviceName: "Aria"
   property alias searchQuery: searchController.searchQuery
   property alias searchGroups: searchController.searchGroups
   property alias searchError: searchController.searchError
@@ -654,7 +654,7 @@ Item {
       var key = keys[i]
       if (source[key] !== undefined) next[key] = source[key]
     }
-    next.deviceName = String(next.deviceName || "Spoty").trim() || "Spoty"
+    next.deviceName = String(next.deviceName || "Aria").trim() || "Aria"
     next.idleShutdownMinutes = Math.max(0, Math.min(1440,
       Math.floor(Number(next.idleShutdownMinutes) || 0)))
     next.showMiniPlayer = String(next.showMiniPlayer || "On") === "Off" ? "Off" : "On"
@@ -1391,7 +1391,7 @@ Item {
     return {
       device: {
         id: "soloist:spoty",
-        name: root.soloistDeviceName || "Spoty",
+        name: root.soloistDeviceName || "Aria",
         sourceName: "Soloist",
         type: "Computer",
         active: true,
