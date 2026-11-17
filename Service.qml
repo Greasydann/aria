@@ -1349,7 +1349,17 @@ Item {
       var name = String(((entDec.identity || {}).name) || "")
       if (name) {
         subtitleParts.push(name)
-        artists.push({ id: String(ent.uri || "").replace("spotify:artist:", ""), uri: String(ent.uri || ""), type: "artist", name: name, imageUrl: "" })
+        // kind "context" makes openItem open the artist page instead of
+        // treating the artist as playable media.
+        artists.push({
+          kind: "context",
+          id: String(ent.uri || "").replace("spotify:artist:", ""),
+          uri: String(ent.uri || ""),
+          type: "artist",
+          name: name,
+          subtitle: "Artist",
+          imageUrl: ""
+        })
       }
     }
     var parent = (dec.parent && dec.parent.entity) ? dec.parent.entity : null
