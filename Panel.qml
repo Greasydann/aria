@@ -4417,8 +4417,8 @@ Item {
                   foreground: root.foreground
                   HoverHandler {
                     id: currentArtistHover
-                    onHoveredChanged: if (hovered)
-                      root.setPanelCursor("footer", "artist")
+                    onHoveredChanged: root.hoverPanelCursor("footer", "artist",
+                      hovered)
                   }
                   PanelToolTip {
                     visible: currentArtistHover.hovered
@@ -4468,8 +4468,8 @@ Item {
                   foreground: root.foreground
                   HoverHandler {
                     id: currentAlbumHover
-                    onHoveredChanged: if (hovered)
-                      root.setPanelCursor("footer", "album")
+                    onHoveredChanged: root.hoverPanelCursor("footer", "album",
+                      hovered)
                   }
                   PanelToolTip {
                     visible: currentAlbumHover.hovered

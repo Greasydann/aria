@@ -564,7 +564,11 @@ BarWidget {
     if (popupOpen) {
       miniCursor = miniKeyboardActions.indexOf("play") >= 0
         ? "play" : miniKeyboardActions[0]
-      miniCursorActive = miniKeyboardActions.length > 0
+      // Opening the popup is not keyboard navigation or a hover. Keep the
+      // cursor hidden until a key is pressed (moveMiniCursor/setMiniCursor)
+      // or the mouse actually lands on a control, otherwise the first action
+      // shows a highlight on a plain click.
+      miniCursorActive = false
       if (pendingShortcutLatch) latchShortcutMode()
       pendingShortcutLatch = false
     } else {
