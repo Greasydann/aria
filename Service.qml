@@ -3196,11 +3196,8 @@ Item {
     function toggleMiniPlayer(): string { return root.invokePlayerShortcut("toggleMiniPlayerShortcut") }
     function toggleFullPlayer(): string { return root.invokePlayerShortcut("toggleFullPlayerShortcut") }
     function playPause(): string {
-      if (root.soloistDevice() || root.officialSpotifyMprisPlayer() === null) {
-        var bin = root.soloistBin
-        Quickshell.execDetached(["sh", "-c",
-          bin + " ctl now 2>&1 | grep -q '\\bplaying\\b' && " + bin + " ctl pause || " + bin + " ctl play"])
-      }
+      if (root.soloistDevice() || root.officialSpotifyMprisPlayer() === null)
+        Quickshell.execDetached([root.soloistBin, "ctl", root.playing ? "pause" : "play"])
       root.togglePlayback()
       return "ok"
     }
@@ -3734,9 +3731,7 @@ Item {
     var nextState = playing ? "pause" : "play"
     showMediaOsd(nextState)
     if (soloistTarget()) {
-      var bin = root.soloistBin
-      Quickshell.execDetached(["sh", "-c",
-        bin + " ctl now 2>&1 | grep -q '\\bplaying\\b' && " + bin + " ctl pause || " + bin + " ctl play"])
+      Quickshell.execDetached([root.soloistBin, "ctl", nextState])
       return
     }
     if (!useRemotePlayback && hasLocalPlayer && activePlayer.canTogglePlaying) {

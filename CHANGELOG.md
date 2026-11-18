@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.6 (2026-11-18)
+
+- Run the Soloist play/pause commands with the executable and arguments passed
+  separately instead of building a shell command string, so paths with spaces
+  or metacharacters cannot break playback.
+
 ## 1.2.5 (2026-11-18)
 
 - Resolve the Soloist executable from the current user's home (or an explicit

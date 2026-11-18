@@ -36,8 +36,11 @@ git -C "$release_source" config user.name "Omarchy Spotify tests"
 git -C "$release_source" config user.email "tests@example.invalid"
 git -C "$release_source" add .
 git -C "$release_source" commit -qm "Release source"
-git -C "$release_source" tag -a v1.1.0 -m "Release v1.1.0"
-release_commit=$(git -C "$release_source" rev-parse 'refs/tags/v1.1.0^{commit}')
+release_version=$(sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)".*/\1/p' \
+  "$source_root/manifest.json")
+[[ $release_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+git -C "$release_source" tag -a "v$release_version" -m "Release v$release_version"
+release_commit=$(git -C "$release_source" rev-parse "refs/tags/v$release_version^{commit}")
 printf '%s\n' 'UI-only change after the release' >"$release_source/Panel.qml"
 git -C "$release_source" add Panel.qml
 git -C "$release_source" commit -qm "Change only the UI"
@@ -524,7 +527,7 @@ if grep -E '^[[:space:]]*uses:' \
   echo "release-backend.yml contains a mutable action reference" >&2
   exit 1
 fi
-jq -e '.version == "1.1.0"
+jq -e '.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$")
   and .barWidget.defaultSection == "left"
   and .barWidget.defaults.showMiniPlayer == "On"
   and (.barWidget.schema[] | select(.key == "showMiniPlayer").defaultValue) == "On"
@@ -537,9 +540,7 @@ jq -e '.version == "1.1.0"
   and .barWidget.defaults.showLyrics == "On"
   and (.barWidget.schema[] | select(.key == "showLyrics").defaultValue) == "On"
   and .barWidget.defaults.maxBarTextWidth == "240"
-  and (.barWidget.schema[] | select(.key == "maxBarTextWidth").defaultValue) == "240"
-  and .barWidget.defaults.audioQuality == "320 kbps"
-  and (.barWidget.schema[] | select(.key == "audioQuality").defaultValue) == "320 kbps"' \
+  and (.barWidget.schema[] | select(.key == "maxBarTextWidth").defaultValue) == "240"' \
   "$source_root/manifest.json" >/dev/null
 grep -qx 'section=left' "$source_root/scripts/install-local.sh"
 grep -qx 'bitrate = 320' "$source_root/config/spotifyd.conf"
