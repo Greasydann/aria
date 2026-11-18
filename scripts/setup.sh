@@ -78,22 +78,12 @@ config_file="$config_dir/spotifyd.conf"
 
 backend_binary=${OMARCHY_SPOTIFY_RUNTIME_DIR:-"$HOME/.local/lib/omarchy-spotify"}/omarchy-spotify-backend
 runtime_dir=$(dirname -- "$backend_binary")
-backend_source_id_file="$runtime_dir/backend-source.sha256"
-backend_binary_hash_file="$runtime_dir/backend-binary.sha256"
 backend_ready=0
 
 backend_install_is_current() {
-  local current_source_id expected_source_id expected_binary_hash actual_binary_hash
-
-  [[ -x $backend_binary && -s $backend_source_id_file \
-    && -s $backend_binary_hash_file ]] || return 1
-  current_source_id=$("$source_root/scripts/backend-source-id.sh") || return 1
-  expected_source_id=$(<"$backend_source_id_file")
-  [[ $expected_source_id == "$current_source_id" ]] || return 1
-  expected_binary_hash=$(<"$backend_binary_hash_file")
-  [[ $expected_binary_hash =~ ^[0-9a-f]{64}$ ]] || return 1
-  actual_binary_hash=$(sha256sum -- "$backend_binary") || return 1
-  [[ ${actual_binary_hash%% *} == "$expected_binary_hash" ]]
+  # Shared with native-session.sh, which re-runs the same verification before
+  # every launch so a stale or tampered binary is never started.
+  "$source_root/scripts/backend-verify.sh" "$backend_binary" "$source_root" 2>/dev/null
 }
 
 if backend_install_is_current; then
