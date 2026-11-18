@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.7 (2026-11-18)
+
+- Verify the installed backend's source identity and binary hash before every
+  login launch, reusing the setup checks; a stale or tampered binary now shows
+  the setup prompt instead of starting.
+
 ## 1.2.6 (2026-11-18)
 
 - Run the Soloist play/pause commands with the executable and arguments passed
