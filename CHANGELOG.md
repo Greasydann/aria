@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.8 (2026-11-18)
+
+- Fix the volume slider in the mini and full player during Soloist playback: volume
+  commands now go to the Soloist receiver instead of a Web API call that cannot
+  control it, so the slider no longer snaps back to its old position.
+
+
 ## 1.2.7 (2026-11-18)
 
 - Verify the installed backend's source identity and binary hash before every

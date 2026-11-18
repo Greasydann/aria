@@ -1254,6 +1254,12 @@ Item {
       if (receiver) spotifyConnectManager.rememberVolume(receiver.id, remotePercent)
     }
     if (sendSonosControl("volume", String(Math.round(normalized * 100)))) return true
+    if (soloistTarget()) {
+      // Soloist takes volume in percent; the pending-volume hold above is
+      // released when a soloist poll reports the new level.
+      soloistCtl(["volume", String(Math.round(normalized * 100))])
+      return true
+    }
     if (localVolume)
       activePlayer.volume = normalized
     else apiAction("PUT", "/me/player/volume",
