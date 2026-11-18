@@ -79,13 +79,28 @@ your Omarchy theme.
 Top albums and EPs sit beside the artist's ten biggest songs, with their
 **This Is** playlist and full catalog only a search away.
 
-![The Frank Ocean artist page with top albums and top songs while Lost is playing](docs/screenshots/artist.webp)
+![The Frank Ocean artist page with top albums and top songs](docs/screenshots/artist.webp)
+
+### Sing along, line by line
+
+Built-in lyrics follow the song in real time—no extra app, no browser tab.
+The current line lights up as it plays, teleprompter style.
+
+![The lyrics view following Lost by Frank Ocean line by line, with the current line highlighted](docs/screenshots/lyrics.webp)
 
 ### A mini player that belongs in your desktop
 
 The essentials are always one click away, without reopening the full app.
 
 ![The mini player showing Lost by Frank Ocean with playback controls and volume](docs/screenshots/mini-player.webp)
+
+### Make it yours
+
+Pick the page the player opens on—For you, Liked Songs, Search, Playlists, or
+one specific playlist—then tune the bar player, artwork and keyboard hints to
+taste.
+
+![The Settings page with the landing page picker between For you, Liked Songs, Search and Playlists](docs/screenshots/settings.webp)
 
 ## Log in with Spotify
 
