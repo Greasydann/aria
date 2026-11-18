@@ -428,6 +428,32 @@ function normalizedLandingPage(value) {
     ? page : "liked"
 }
 
+// Spotify serves covers from i.scdn.co. Only those URLs go through the local
+// artwork cache; anything else is passed to Image unchanged.
+function isCacheableImage(value) {
+  return /^https:\/\/[a-z0-9.-]*scdn\.co\//i.test(String(value || ""))
+}
+
+// FNV-1a 32-bit, matching scripts/artwork_cache.py so QML can find a cached
+// file before the helper reports it.
+function artworkCacheKey(value) {
+  var url = String(value || "")
+  var hash = 0x811c9dc5
+  for (var i = 0; i < url.length; i++) {
+    hash ^= url.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193) >>> 0
+  }
+  return ("00000000" + hash.toString(16)).slice(-8)
+}
+
+// Components call this so a missing cache (tests, early startup) still shows
+// the remote cover.
+function cachedArt(cache, value) {
+  var url = String(value || "")
+  return cache && typeof cache.imageUrl === "function"
+    ? cache.imageUrl(url) : url
+}
+
 function normalizedShortcutHints(value) {
   return String(value || "On") === "Off" ? "Off" : "On"
 }

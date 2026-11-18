@@ -1960,6 +1960,17 @@ TestCase {
     compare(Api.normalizedLandingPage(undefined), "liked")
   }
 
+  function test_artworkCache_helpers() {
+    compare(Api.isCacheableImage("https://i.scdn.co/image/example"), true)
+    compare(Api.isCacheableImage("http://i.scdn.co/image/example"), false)
+    compare(Api.isCacheableImage("https://example.com/cover.jpg"), false)
+    compare(Api.artworkCacheKey("https://i.scdn.co/image/example"), "837f4ac4")
+    compare(Api.cachedArt(null, "https://i.scdn.co/image/example"),
+      "https://i.scdn.co/image/example")
+    var cache = { imageUrl: function(url) { return "file:///cached/" + url } }
+    compare(Api.cachedArt(cache, "cover"), "file:///cached/cover")
+  }
+
   function test_payloadDetailItem_fillsWhatThePageBinds() {
     // The mini player sends only type/id/name; the detail page binds uri,
     // subtitle, artists and imageUrl before the metadata request lands.

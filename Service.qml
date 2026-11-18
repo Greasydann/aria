@@ -192,6 +192,7 @@ Item {
   readonly property bool shortcutHintsEnabled: String(settings.shortcutHints || "On") !== "Off"
   readonly property bool showLyrics: String(settings.showLyrics || "On") !== "Off"
   readonly property bool artworkEnabled: String(settings.showArtwork || "On") !== "Off"
+  readonly property var artCache: artworkCache
   readonly property bool showTrackTitle: String(settings.showTrackTitle || "On") !== "Off"
   readonly property bool showArtistName: String(settings.showArtistName || "Off") === "On"
   readonly property bool showPausedTrack: String(settings.showPausedTrack || "On") !== "Off"
@@ -4245,6 +4246,13 @@ Item {
     onTriggered: {
       root.fail("Spotify settings are unavailable. Reopen the player to retry.")
     }
+  }
+
+  ArtworkCache {
+    id: artworkCache
+    enabled: root.artworkEnabled
+    cacheDir: root.stateDir + "/artwork"
+    scriptPath: root.pluginDir + "/scripts/artwork_cache.py"
   }
 
   Timer {

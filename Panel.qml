@@ -4212,8 +4212,9 @@ Item {
                   anchors.fill: parent
                   anchors.margins: Style.space(2)
                   requestedSource: root.service && root.service.artworkEnabled
-                    ? Api.idleMediaText(root.service.artUrl,
-                      root.service.lastPlayedItem, "imageUrl", "")
+                    ? Api.cachedArt(root.service.artCache,
+                      Api.idleMediaText(root.service.artUrl,
+                        root.service.lastPlayedItem, "imageUrl", ""))
                     : ""
                   sourceSize.width: 136
                   sourceSize.height: 136
@@ -4934,7 +4935,8 @@ Item {
                 anchors.fill: parent
                 anchors.margins: Style.space(2)
                 requestedSource: root.service && root.service.artworkEnabled && root.service.detailItem
-                  ? String(root.service.detailItem.imageUrl || "") : ""
+                  ? Api.cachedArt(root.service.artCache,
+                    String(root.service.detailItem.imageUrl || "")) : ""
                 sourceSize.width: 256
                 sourceSize.height: 256
                 fillMode: Image.PreserveAspectFit
@@ -5195,6 +5197,7 @@ Item {
                 showPlaylist: false
                 showSave: true
                 artworkEnabled: !root.service || root.service.artworkEnabled
+                artCache: root.service ? root.service.artCache : null
                 saved: root.service && root.service.isSaved(itemData)
                 onActivated: function(item) { root.activateMedia(item, [item], item.uri) }
                 onOpenRequested: function(item) { root.openItem(item) }
@@ -5364,6 +5367,7 @@ Item {
                     showPlaylist: showQueue
                     showSave: true
                     artworkEnabled: !root.service || root.service.artworkEnabled
+                    artCache: root.service ? root.service.artCache : null
                     saved: root.service && root.service.isSaved(modelData)
                     onActivated: function(item) {
                       var sectionId = searchMediaGroup.rowData.sectionId
@@ -6010,6 +6014,7 @@ Item {
             showQueue: false
             showSave: true
             artworkEnabled: !root.service || root.service.artworkEnabled
+            artCache: root.service ? root.service.artCache : null
             saved: root.service && root.service.isSaved(modelData)
             onActivated: function(item) {
               root.activateMedia(item, queueRoot.visibleItems, "")

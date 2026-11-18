@@ -951,7 +951,8 @@ BarWidget {
               anchors.fill: parent
               anchors.margins: Style.space(3)
               requestedSource: !root.vinylRecordEnabled && root.popupOpen && root.spotify && root.spotify.artworkEnabled
-                ? Api.idleMediaText(root.spotify.artUrl, root.spotify.lastPlayedItem, "imageUrl", "") : ""
+                ? Api.cachedArt(root.spotify.artCache,
+                  Api.idleMediaText(root.spotify.artUrl, root.spotify.lastPlayedItem, "imageUrl", "")) : ""
               sourceSize.width: 156
               sourceSize.height: 156
               fillMode: Image.PreserveAspectFit
@@ -1011,7 +1012,8 @@ BarWidget {
                 id: popupRecordArtwork
                 anchors.fill: parent
                 requestedSource: root.vinylRecordEnabled && root.popupOpen && root.spotify && root.spotify.artworkEnabled
-                  ? Api.idleMediaText(root.spotify.artUrl, root.spotify.lastPlayedItem, "imageUrl", "") : ""
+                  ? Api.cachedArt(root.spotify.artCache,
+                    Api.idleMediaText(root.spotify.artUrl, root.spotify.lastPlayedItem, "imageUrl", "")) : ""
                 sourceSize.width: 156
                 sourceSize.height: 156
                 fillMode: Image.PreserveAspectCrop

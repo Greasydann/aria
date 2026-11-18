@@ -7,6 +7,9 @@
   their own page.
 - Fix a settings race where the shell's pre-write config snapshot could undo a
   just-saved preference on its way back through the bar widget.
+- Cache artwork on disk with HTTP/1.1 instead of relying on Qt's HTTP/2 image
+  loader, which Spotify's CDN intermittently drops. Covers now survive shell
+  restarts and appear immediately; remote URLs remain a seamless fallback.
 - Reopen the full player after the Omarchy shell restarts while it was open.
   Explicit closes (bar icon, Escape, the close button) stay closed, and a
   login hours later does not reopen a panel left open in the previous session.

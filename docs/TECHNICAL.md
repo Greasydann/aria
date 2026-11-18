@@ -123,6 +123,13 @@ explicit payload (an artist or album link) selects a different page. The
 record also notes whether the full player was open, with a short heartbeat, so
 a shell restart can reopen it while a later login stays closed. Older copies kept as plugin settings
 are read once and removed from `shell.json` after that file is written.
+Album and playlist covers are downloaded by a small HTTP/1.1 helper into
+`$XDG_STATE_HOME/aria/artwork` (capped at 320 files). Qt's own image loader uses
+HTTP/2, which Spotify's image CDN intermittently drops, so covers loaded only
+after a long retry backoff; the local copies are ready immediately and survive
+shell restarts. Remote URLs remain the fallback until a cached file is ready,
+and no covers are fetched at all when artwork is switched off.
+
 Short-lived access tokens and PKCE values remain in the shell process. OAuth
 state is checked, callback listeners bind explicitly to IPv4 loopback, API URLs
 are restricted to

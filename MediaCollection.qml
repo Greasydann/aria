@@ -463,6 +463,7 @@ Item {
           ? (index < root.dragSourceIndex ? -1 : 1) : 0
         saved: root.service ? root.service.isSaved(modelData) : false
         artworkEnabled: !root.service || root.service.artworkEnabled
+        artCache: root.service ? root.service.artCache : null
         ShortcutHint {
           ctrlHeld: root.keyboardCtrlHeld
           shiftHeld: root.keyboardShiftHeld

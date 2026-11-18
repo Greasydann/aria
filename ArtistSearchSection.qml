@@ -94,6 +94,7 @@ Column {
         showSave: root.showSave
         saved: root.service ? root.service.isSaved(modelData) : false
         artworkEnabled: !root.service || root.service.artworkEnabled
+        artCache: root.service ? root.service.artCache : null
         onActivated: function(item) {
           root.activated(item, root.sourceItems, root.contextUri)
         }
