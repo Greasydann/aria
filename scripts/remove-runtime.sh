@@ -2,6 +2,7 @@
 set -euo pipefail
 
 purge=0
+purge_failed=0
 if [[ ${1:-} == "--purge" ]]; then
   purge=1
   shift
@@ -20,6 +21,7 @@ fallback_unit_file="$config_root/systemd/user/omarchy-spotifyd.service"
 config_dir="$config_root/omarchy-spotify"
 build_cache_dir="$cache_root/omarchy-spotify"
 state_dir="$state_root/omarchy-spotify"
+aria_state_dir="$state_root/aria"
 session_runtime_dir="$session_runtime_root/omarchy-spotify"
 runtime_dir=${OMARCHY_SPOTIFY_RUNTIME_DIR:-"$HOME/.local/lib/omarchy-spotify"}
 backend_binary="$runtime_dir/omarchy-spotify-backend"
@@ -39,6 +41,7 @@ require_safe_path() {
 require_safe_path "configuration root" "$config_root"
 require_safe_path "cache root" "$cache_root"
 require_safe_path "state root" "$state_root"
+require_safe_path "Aria state" "$aria_state_dir"
 require_safe_path "session runtime root" "$session_runtime_root"
 require_safe_path "backend runtime" "$runtime_dir"
 runtime_dir_is_dedicated=0
@@ -102,6 +105,17 @@ if (( purge )); then
     rm -rf -- "$state_dir"
     echo "Removed durable playback authorization and session state."
   fi
+  # The current generation keeps everything plugin-owned under state/aria:
+  # the optional Web API refresh token, session memory and the artwork cache.
+  # A complete uninstall removes all of it and reports what it could not.
+  if [[ -e $aria_state_dir || -L $aria_state_dir ]]; then
+    if rm -rf -- "$aria_state_dir"; then
+      echo "Removed plugin tokens and session state."
+    else
+      echo "remove-runtime.sh: failed to remove plugin state: $aria_state_dir" >&2
+      purge_failed=1
+    fi
+  fi
   if [[ -d $session_runtime_dir ]]; then
     [[ $session_runtime_dir == "$session_runtime_root/omarchy-spotify" ]] || exit 3
     rm -rf -- "$session_runtime_dir"
@@ -130,6 +144,11 @@ if (( purge )); then
   fi
 else
   rmdir -- "$runtime_dir" 2>/dev/null || true
+fi
+
+if (( purge_failed )); then
+  echo "remove-runtime.sh: some plugin files could not be deleted; remove them manually." >&2
+  exit 4
 fi
 
 echo "Runtime integration removed. The spotifyd package and its own cache were left alone."

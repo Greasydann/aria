@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.3 (2026-11-18)
+
+- Complete uninstall now also removes the plugin-owned token and session state
+  under `~/.local/state/aria` (the optional Web API refresh token included),
+  reporting anything it cannot delete.
+
 ## 1.2.2 (2026-11-18)
 
 - setup.sh no longer rewrites an existing spotifyd fallback configuration

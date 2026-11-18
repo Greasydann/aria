@@ -46,6 +46,6 @@ if command -v rg >/dev/null 2>&1 && [[ -d $hypr_config ]] \
   echo "Remove those custom lines (and their dotfiles source), then run hyprctl reload." >&2
 fi
 
-echo "Aria's plugin data and runtime have been completely uninstalled."
+echo "Aria's plugin data, tokens and runtime have been completely uninstalled."
 echo "External source checkouts, other plugins, the spotifyd package, and its"
 echo "own cache were left alone."
