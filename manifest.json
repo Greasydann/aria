@@ -5,7 +5,7 @@
   "version": "1.2.2",
   "author": "Dann",
   "license": "MIT",
-  "description": "A Spotify player for the Omarchy bar — full player, mini player and synced lyrics — with local playback through your Soloist receiver. Lightweight: about 12 MB installed and ~20 MB of RAM.",
+  "description": "A beautiful and minimal Spotify player for the Omarchy bar — full player, mini player and synced lyrics — with local playback through your Soloist receiver. Lightweight: about 12 MB installed and ~20 MB of RAM.",
   "kinds": [
     "service",
     "bar-widget",
