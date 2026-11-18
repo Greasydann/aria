@@ -323,13 +323,15 @@ BarWidget {
     stdout: StdioCollector { waitForEnd: true }
     stderr: StdioCollector { waitForEnd: true }
     onExited: {
+      // Omarchy's Lua dispatcher owns workspace slots, so the switch goes
+      // through its documented expression.
       var clients = Api.parseJson(stdout.text, [])
       if (!Array.isArray(clients)) return
       for (var i = 0; i < clients.length; i++) {
         var client = clients[i]
         if (!client || !client.workspace) continue
         if (String(client.title || "").indexOf("Aria") !== 0) continue
-        Hyprland.dispatch("workspace id:" + client.workspace.id)
+        Hyprland.dispatch("o.workspaces.focus(" + client.workspace.id + ")")
         return
       }
     }
