@@ -112,11 +112,13 @@ Connect receiver needs a streaming grant; they do not enter shell arguments,
 settings or diagnostic logs. Old client-scoped keyring entries are untouched.
 
 Reusable local-playback authorization is stored with owner-only permissions in
-`$XDG_STATE_HOME/omarchy-spotify`; older credentials under `$XDG_CACHE_HOME`
+`$XDG_STATE_HOME/aria`; older credentials under `$XDG_CACHE_HOME`
 are accepted once and migrated so clearing disposable caches cannot deauthorize
-this computer. Player restore state (last tab, filters, search history, and
-similar) is written to `$XDG_STATE_HOME/omarchy-spotify/session.json` so it
-does not pollute Omarchy's `shell.json`. Older copies kept as plugin settings
+this computer. Player preferences (filters, search history, scroll positions,
+and similar) are written to `$XDG_STATE_HOME/aria/session.json` so they do not
+pollute Omarchy's `shell.json`. The last page is not part of that state: the
+player always opens on Liked Songs, and only an explicit payload (an artist or
+album link) selects a different page. Older copies kept as plugin settings
 are read once and removed from `shell.json` after that file is written.
 Short-lived access tokens and PKCE values remain in the shell process. OAuth
 state is checked, callback listeners bind explicitly to IPv4 loopback, API URLs

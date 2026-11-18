@@ -36,6 +36,10 @@ Item {
   property bool lyricsViewOpen: false
   property string searchType: "track"
   property string libraryType: "tracks"
+  // The player always opens on this page. Detail pages are shown only when a
+  // surface explicitly asks for one (mini-player byline, notification, ...),
+  // so closing and reopening never drops you on a random last page.
+  readonly property string defaultTab: "library"
   property string homeType: "recent"
   property string libraryFilter: ""
   property string librarySort: "default"
@@ -427,7 +431,7 @@ Item {
     scrollPositionOrder = order
   }
 
-  function restoreUiState(restoreDetail) {
+  function restoreUiState() {
     if (!service) return
     var state = service.sessionState || ({})
     service.restoreLastRadioPlaylist(state.lastRadioPlaylist)
@@ -461,17 +465,8 @@ Item {
       state.selectedPlaylistItemCount)
     restoredDetailItemCount = Api.normalizedPlaylistRestoreCount(
       state.detailItemCount)
-    var restoredTab = String(state.tab || "home")
-    if (["home", "discover", "search", "library", "playlists", "detail", "queue", "devices", "setup"]
-        .indexOf(restoredTab) >= 0) currentTab = restoredTab
-    if (restoreDetail !== false && currentTab === "detail" && state.detailItem) {
-      var sameDetail = service.detailItem
-        && String(service.detailItem.id) === String(state.detailItem.id)
-        && String(service.detailItem.type) === String(state.detailItem.type)
-      if (sameDetail) service.ensureDetailItemCount(restoredDetailItemCount)
-      else service.openDetail(state.detailItem, artistSearchText,
-        restoredDetailItemCount)
-    }
+    // The last page is intentionally not restored: open() picks the fixed
+    // landing page (or the page a payload asks for).
     syncUnifiedSearchField()
   }
 
@@ -1844,6 +1839,20 @@ Item {
     lyricsViewOpen = !lyricsViewOpen
   }
 
+  // Reset to the fixed landing page. Filters, sorting and scroll memory are
+  // cleared too, so every open starts from the same resting state.
+  function openDefaultPage() {
+    currentTab = defaultTab
+    libraryType = "tracks"
+    libraryFilter = ""
+    librarySort = "default"
+    searchText = ""
+    universalSearchActive = false
+    searchInContext = true
+    navigationStack = []
+    rememberScroll("library:tracks", 0)
+  }
+
   function open(payloadJson) {
     searchClock = Date.now()
     var payload = ({})
@@ -1854,7 +1863,9 @@ Item {
     var requestedTab = String(payload.tab || "")
     var requestedDetail = requestedTab === "detail" && payload.detailItem
       ? Api.payloadDetailItem(payload.detailItem) : null
-    restoreUiState(!requestedDetail)
+    // Session state holds preferences (filters, scroll memory, the selected
+    // playlist) but the last page is deliberately not restored.
+    restoreUiState()
     if (requestedDetail) {
       currentTab = "detail"
       navigationStack = []
@@ -1864,6 +1875,8 @@ Item {
       detailFilter = ""
     } else if (["home", "discover", "search", "library", "playlists", "queue", "devices", "setup"].indexOf(requestedTab) >= 0)
       currentTab = requestedTab
+    else
+      openDefaultPage()
     if (accountConnected) {
       openedForLogin = false
     } else if (!sessionPending) {
@@ -3520,7 +3533,12 @@ Item {
                 focusable: false
                 hasCursor: root.cursorOn("sidebar", "nav-library")
                 tooltipText: "Liked Songs"
-                onClicked: root.chooseTab("library")
+                onClicked: {
+                  // The labelled shortcut always means saved songs, whatever
+                  // library section was last open.
+                  root.libraryType = "tracks"
+                  root.chooseTab("library")
+                }
                 onHovered: function(on) { root.hoverPanelCursor("sidebar", "nav-library", on) }
                 KeyHint { region: "sidebar"; action: "nav-library" }
                 OpticalGlyph {

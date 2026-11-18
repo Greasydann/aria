@@ -41,6 +41,10 @@ to learn. Your library and playlists live in the sidebar, search stays at the
 top, the player stays at the bottom, and artist and album names take you
 straight to their pages.
 
+Every open starts on the same page — your Liked Songs — so closing the app
+never leaves you on a half-remembered screen. Artist, album and playlist links
+still open exactly where you pointed them.
+
 Prefer to keep your hands on the keyboard? The whole app is designed for that
 too.
 
