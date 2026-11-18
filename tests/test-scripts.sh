@@ -158,39 +158,15 @@ expected_challenge=$(printf '%s' "$verifier" |
   tr -d '=')
 [[ $challenge == "$expected_challenge" ]]
 
-mkdir -p "$test_root/config/omarchy-spotify"
-cp -- "$source_root/config/spotifyd.conf" "$test_root/config/omarchy-spotify/spotifyd.conf"
-printf '%s\n' 'device = "legacy_output"' >>"$test_root/config/omarchy-spotify/spotifyd.conf"
-printf '%s\n%s\n' "Desk speakers" 320 |
-  XDG_CONFIG_HOME="$test_root/config" "$source_root/scripts/configure-spotifyd.sh"
-grep -qx 'device_name = "Desk speakers"' "$test_root/config/omarchy-spotify/spotifyd.conf"
-grep -qx 'bitrate = 320' "$test_root/config/omarchy-spotify/spotifyd.conf"
-grep -qx 'no_audio_cache = false' "$test_root/config/omarchy-spotify/spotifyd.conf"
-grep -qx 'max_cache_size = 1000000000' "$test_root/config/omarchy-spotify/spotifyd.conf"
-! grep -q '^device[[:space:]]*=' "$test_root/config/omarchy-spotify/spotifyd.conf"
-grep -qx 'autoplay = true' "$test_root/config/omarchy-spotify/spotifyd.conf"
 
-printf '%s\n' "Renamed speakers" |
-  XDG_CONFIG_HOME="$test_root/config" "$source_root/scripts/configure-spotifyd.sh"
-grep -qx 'device_name = "Renamed speakers"' "$test_root/config/omarchy-spotify/spotifyd.conf"
-grep -qx 'bitrate = 320' "$test_root/config/omarchy-spotify/spotifyd.conf"
-! grep -q '^device[[:space:]]*=' "$test_root/config/omarchy-spotify/spotifyd.conf"
+# The local Spotify Connect encryption helper must pass its own self-test.
+[[ -x $source_root/scripts/spotify-connect-device.py ]]
+"$source_root/scripts/spotify-connect-device.py" self-test |
+  jq -e '.status == "ok"' >/dev/null
 
-printf '%s\n%s\n\n' "Desk speakers" 96 |
-  XDG_CONFIG_HOME="$test_root/config" "$source_root/scripts/configure-spotifyd.sh"
-grep -qx 'bitrate = 96' "$test_root/config/omarchy-spotify/spotifyd.conf"
-! grep -q '^device[[:space:]]*=' "$test_root/config/omarchy-spotify/spotifyd.conf"
-
-set +e
-printf '%s\n' 'invalid"name' |
-  XDG_CONFIG_HOME="$test_root/config" "$source_root/scripts/configure-spotifyd.sh"
-invalid_status=$?
-set -e
-[[ $invalid_status -eq 3 ]]
-
-# Exercise setup and removal entirely inside the temporary tree. The mock
-# spotifyd/systemctl binaries prevent package, service, keyring, or user-config
-# changes while still covering the scripts' real file permissions and paths.
+# Exercise setup, removal and uninstall entirely inside the temporary tree.
+# The mock binaries prevent package, service, keyring, or user-config changes
+# while still covering the scripts' real file permissions and paths.
 mock_bin="$test_root/mock-bin"
 runtime_config="$test_root/runtime-config"
 runtime_cache="$test_root/runtime-cache"
@@ -208,6 +184,7 @@ mkdir -p "$mock_bin" "$runtime_config" "$runtime_cache" "$runtime_state" \
 printf '%s\n' '#!/bin/sh' 'exit 0' >"$mock_bin/spotifyd"
 printf '%s\n' \
   '#!/bin/sh' \
+  'set -eu' \
   'mkdir -p "${CARGO_TARGET_DIR:?}/release"' \
   'printf "%s\n" "mock source-built backend" >"$CARGO_TARGET_DIR/release/omarchy-spotify-backend"' \
   'chmod 755 "$CARGO_TARGET_DIR/release/omarchy-spotify-backend"' \
@@ -215,9 +192,6 @@ printf '%s\n' \
 printf '%s\n' \
   '#!/bin/sh' \
   'if [ -n "${TEST_SYSTEMCTL_LOG:-}" ]; then printf "%s\n" "$*" >>"$TEST_SYSTEMCTL_LOG"; fi' \
-  'if [ "${1:-}" = "--user" ]; then shift; fi' \
-  'if [ "${1:-}" = "is-enabled" ]; then exit 1; fi' \
-  'if [ "${1:-}" = "is-active" ]; then [ "${TEST_SERVICE_ACTIVE:-0}" = 1 ]; exit; fi' \
   'exit 0' >"$mock_bin/systemctl"
 printf '%s\n' \
   '#!/bin/sh' \
@@ -226,75 +200,76 @@ printf '%s\n' \
 printf '%s\n' \
   '#!/bin/sh' \
   'printf "%s\n" "$*" >>"${TEST_OMARCHY_LOG:?}"' \
-  'if [ "$*" = "plugin remove quickshell.spotify --yes" ]; then' \
-  '  rm -f -- "$HOME/.config/omarchy/plugins/quickshell.spotify"' \
+  'if [ "$*" = "plugin remove aria --yes" ]; then' \
+  '  rm -f -- "$HOME/.config/omarchy/plugins/aria"' \
   'fi' \
   'exit 0' >"$mock_bin/omarchy"
+for mock_helper in socat xdg-open avahi-browse; do
+  printf '%s\n' '#!/bin/sh' 'exit 0' >"$mock_bin/$mock_helper"
+done
 chmod 755 "$mock_bin/cargo" "$mock_bin/spotifyd" "$mock_bin/systemctl" \
-  "$mock_bin/secret-tool" "$mock_bin/omarchy"
+  "$mock_bin/secret-tool" "$mock_bin/omarchy" "$mock_bin/socat" \
+  "$mock_bin/xdg-open" "$mock_bin/avahi-browse"
 
-[[ -x $source_root/scripts/spotify-connect-device.py ]]
-"$source_root/scripts/spotify-connect-device.py" self-test |
-  jq -e '.status == "ok"' >/dev/null
+sandbox_env=(
+  "PATH=$mock_bin:$PATH"
+  "HOME=$runtime_home"
+  "XDG_CONFIG_HOME=$runtime_config"
+  "XDG_CACHE_HOME=$runtime_cache"
+  "XDG_STATE_HOME=$runtime_state"
+  "XDG_RUNTIME_DIR=$runtime_session"
+  "OMARCHY_SPOTIFY_RUNTIME_DIR=$runtime_backend"
+)
 
-PATH="$mock_bin:$PATH" \
-XDG_CONFIG_HOME="$runtime_config" \
-XDG_CACHE_HOME="$runtime_cache" \
-XDG_STATE_HOME="$runtime_state" \
-OMARCHY_SPOTIFY_RUNTIME_DIR="$runtime_backend" \
-OMARCHY_SPOTIFY_SKIP_BACKEND_BUILD=1 \
-  "$source_root/scripts/setup.sh" --device-name "Test speakers" >/dev/null
-
-runtime_spotify_config="$runtime_config/omarchy-spotify/spotifyd.conf"
-runtime_unit="$runtime_config/systemd/user/omarchy-spotifyd.service"
-[[ -f $runtime_spotify_config && -f $runtime_unit ]]
+# A fresh setup stamps the device name into a private copy of the template
+# (600 perms) and installs no systemd units: playback starts on demand.
+env "${sandbox_env[@]}" \
+  "OMARCHY_SPOTIFY_SKIP_BACKEND_BUILD=1" \
+  "$source_root/scripts/setup.sh" --device-name "Test speakers" \
+  >"$test_root/setup-fresh.log"
+runtime_config_dir="$runtime_config/omarchy-spotify"
+runtime_spotify_config="$runtime_config_dir/spotifyd.conf"
+[[ -f $runtime_spotify_config ]]
 [[ $(stat -c '%a' "$runtime_spotify_config") == 600 ]]
-[[ $(stat -c '%a' "$runtime_unit") == 644 ]]
+[[ $(stat -c '%a' "$runtime_config_dir") == 700 ]]
 grep -qx 'device_name = "Test speakers"' "$runtime_spotify_config"
+grep -qx 'bitrate = 320' "$runtime_spotify_config"
 grep -qx 'no_audio_cache = false' "$runtime_spotify_config"
 grep -qx 'max_cache_size = 1000000000' "$runtime_spotify_config"
-grep -qx 'Environment=PULSE_LATENCY_MSEC=30' "$runtime_unit"
+grep -q 'Installed private config' "$test_root/setup-fresh.log"
+[[ ! -e $runtime_config/systemd ]]
 
-PATH="$mock_bin:$PATH" \
-XDG_CONFIG_HOME="$runtime_config" \
-XDG_CACHE_HOME="$runtime_cache" \
-XDG_STATE_HOME="$runtime_state" \
-OMARCHY_SPOTIFY_RUNTIME_DIR="$runtime_backend" \
-  "$source_root/scripts/remove-runtime.sh" >/dev/null
+# An existing configuration is kept byte-identical unless --force-config asks
+# for a refresh.
+config_before_hash=$(sha256sum -- "$runtime_spotify_config")
+config_before_mtime=$(stat -c '%Y' "$runtime_spotify_config")
+env "${sandbox_env[@]}" \
+  "OMARCHY_SPOTIFY_SKIP_BACKEND_BUILD=1" \
+  "$source_root/scripts/setup.sh" >"$test_root/setup-keep.log"
+grep -q 'Keeping existing configuration' "$test_root/setup-keep.log"
+! grep -q 'Installed private config' "$test_root/setup-keep.log"
+[[ $(sha256sum -- "$runtime_spotify_config") == "$config_before_hash" ]]
+[[ $(stat -c '%Y' "$runtime_spotify_config") == "$config_before_mtime" ]]
 
-[[ ! -e $runtime_unit && ! -e $runtime_config/omarchy-spotify ]]
-find "$runtime_config" -maxdepth 1 -type d -name 'omarchy-spotify.bak.*' \
-  | grep -q .
+env "${sandbox_env[@]}" \
+  "OMARCHY_SPOTIFY_SKIP_BACKEND_BUILD=1" \
+  "$source_root/scripts/setup.sh" --force-config \
+  --device-name "Fresh speakers" >"$test_root/setup-forced.log"
+grep -q 'Backed up previous configuration' "$test_root/setup-forced.log"
+grep -qx 'device_name = "Fresh speakers"' "$runtime_spotify_config"
+find "$runtime_config_dir" -maxdepth 1 -name 'spotifyd.conf.bak.*' | grep -q .
 
-# A playback-only fallback must not be reported as a successful native setup.
-if PATH="$mock_bin:$PATH" \
-XDG_CONFIG_HOME="$runtime_config" \
-XDG_CACHE_HOME="$runtime_cache" \
-XDG_STATE_HOME="$runtime_state" \
-OMARCHY_SPOTIFY_RUNTIME_DIR="$runtime_backend" \
-OMARCHY_SPOTIFY_SKIP_BACKEND_BUILD=1 \
-  "$source_root/scripts/setup-playback.sh" >/dev/null 2>&1; then
-  echo "Native setup accepted a playback-only fallback" >&2
-  exit 1
-fi
-
-# A clean source install records both the reviewed backend-source fingerprint
-# and installed executable hash. The release path writes the same records only
-# after its exact-commit attestation succeeds.
+# A clean source install records the reviewed backend-source fingerprint, the
+# installed executable hash and the build origin.
 rm -f -- "$runtime_backend/omarchy-spotify-backend" \
   "$runtime_backend/backend-source.sha256" \
   "$runtime_backend/backend-binary.sha256" \
   "$runtime_backend/backend-origin"
-PATH="$mock_bin:$PATH" \
-XDG_CONFIG_HOME="$runtime_config" \
-XDG_CACHE_HOME="$runtime_cache" \
-XDG_STATE_HOME="$runtime_state" \
-OMARCHY_SPOTIFY_RUNTIME_DIR="$runtime_backend" \
-CARGO_TARGET_DIR="$mock_target" \
-OMARCHY_SPOTIFY_BUILD_FROM_SOURCE=1 \
+env "${sandbox_env[@]}" \
+  "CARGO_TARGET_DIR=$mock_target" \
+  "OMARCHY_SPOTIFY_BUILD_FROM_SOURCE=1" \
   "$source_root/scripts/setup.sh" >/dev/null
-runtime_backend_unit="$runtime_config/systemd/user/omarchy-spotify.service"
-[[ -x $runtime_backend/omarchy-spotify-backend && -f $runtime_backend_unit ]]
+[[ -x $runtime_backend/omarchy-spotify-backend ]]
 [[ $(<"$runtime_backend/backend-source.sha256") == "$backend_source_id" ]]
 installed_hash=$(sha256sum -- "$runtime_backend/omarchy-spotify-backend")
 [[ $(<"$runtime_backend/backend-binary.sha256") == "${installed_hash%% *}" ]]
@@ -302,207 +277,208 @@ installed_hash=$(sha256sum -- "$runtime_backend/omarchy-spotify-backend")
 [[ $(stat -c '%a' "$runtime_backend/backend-source.sha256") == 600 ]]
 [[ $(stat -c '%a' "$runtime_backend/backend-binary.sha256") == 600 ]]
 
-# Existing installations must be checked against their recorded source and
-# binary hashes. Re-run setup when the executable or static unit is stale, then
-# restart an already-active backend so it immediately uses the replacement.
-printf '%s\n' 'stale backend' >"$runtime_backend/omarchy-spotify-backend"
+# The shared verification passes for a current install, and setup then takes
+# the ready path without rebuilding.
+env "${sandbox_env[@]}" \
+  "$source_root/scripts/backend-verify.sh" \
+  "$runtime_backend/omarchy-spotify-backend" "$source_root"
+env "${sandbox_env[@]}" \
+  "$source_root/scripts/setup.sh" >"$test_root/setup-ready.log"
+grep -q 'Session backend ready' "$test_root/setup-ready.log"
+
+# A stale or tampered binary is refused: the shared verification reports a
+# one-line reason, native-session asks for setup instead of exec'ing it, and
+# a skip-build setup no longer reports the backend as ready.
+printf '%s\n' 'tampered' >"$runtime_backend/omarchy-spotify-backend"
 chmod 755 "$runtime_backend/omarchy-spotify-backend"
-printf '%s\n' 'stale unit' >"$runtime_backend_unit"
-selected_unit=$(PATH="$mock_bin:$PATH" \
-  XDG_CONFIG_HOME="$runtime_config" \
-  OMARCHY_SPOTIFY_RUNTIME_DIR="$runtime_backend" \
-  "$source_root/scripts/playback-runtime.sh" unit)
-[[ $selected_unit == omarchy-spotifyd.service ]]
+if env "${sandbox_env[@]}" \
+    "$source_root/scripts/backend-verify.sh" \
+    "$runtime_backend/omarchy-spotify-backend" "$source_root" \
+    >"$test_root/verify-tampered.out" 2>&1; then
+  echo "backend-verify.sh accepted a tampered binary" >&2
+  exit 1
+fi
+grep -q 'hash does not match' "$test_root/verify-tampered.out"
+native_session_output=$(printf '{"id":7,"command":"status"}\n' |
+  env "${sandbox_env[@]}" "$source_root/scripts/native-session.sh" 2>/dev/null) || native_session_status=$?
+[[ ${native_session_status:-0} -eq 7 ]]
+grep -q '"id":7' <<<"$native_session_output"
+grep -q 'Aria backend needs an update. Run scripts/setup.sh in the plugin folder, then log in again.' \
+  <<<"$native_session_output"
+env "${sandbox_env[@]}" \
+  "OMARCHY_SPOTIFY_SKIP_BACKEND_BUILD=1" \
+  "$source_root/scripts/setup.sh" >"$test_root/setup-stale.log"
+! grep -q 'Session backend ready' "$test_root/setup-stale.log"
 
+# A source-id mismatch and missing identity files are refused the same way.
+printf '%064d\n' 0 >"$runtime_backend/backend-source.sha256"
+printf '%s\n' 'mock backend' >"$runtime_backend/omarchy-spotify-backend"
+chmod 755 "$runtime_backend/omarchy-spotify-backend"
+if env "${sandbox_env[@]}" \
+    "$source_root/scripts/backend-verify.sh" \
+    "$runtime_backend/omarchy-spotify-backend" "$source_root" \
+    >"$test_root/verify-stale-source.out" 2>&1; then
+  echo "backend-verify.sh accepted a stale source id" >&2
+  exit 1
+fi
+grep -q 'does not match the plugin source' "$test_root/verify-stale-source.out"
+
+rm -f -- "$runtime_backend/backend-source.sha256" \
+  "$runtime_backend/backend-binary.sha256"
+if env "${sandbox_env[@]}" \
+    "$source_root/scripts/backend-verify.sh" \
+    "$runtime_backend/omarchy-spotify-backend" "$source_root" \
+    >"$test_root/verify-missing-identity.out" 2>&1; then
+  echo "backend-verify.sh accepted missing identity files" >&2
+  exit 1
+fi
+grep -q 'identity files are missing' "$test_root/verify-missing-identity.out"
+
+# A missing binary produces the install hint with the request id echoed back
+# (fallback id 1 when the line carries none).
+native_missing_dir="$test_root/runtime-lib-native/omarchy-spotify"
+mkdir -p "$native_missing_dir"
+native_missing_output=$(printf '{"id":4,"command":"login"}\n' |
+  env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
+    "XDG_CONFIG_HOME=$runtime_config" "XDG_CACHE_HOME=$runtime_cache" \
+    "XDG_STATE_HOME=$runtime_state" "XDG_RUNTIME_DIR=$runtime_session" \
+    "OMARCHY_SPOTIFY_RUNTIME_DIR=$native_missing_dir" \
+    "$source_root/scripts/native-session.sh" 2>/dev/null) || native_missing_status=$?
+[[ ${native_missing_status:-0} -eq 7 ]]
+grep -q '"id":4' <<<"$native_missing_output"
+grep -q 'Aria backend is not installed. Run scripts/setup.sh in the plugin folder, then log in again.' \
+  <<<"$native_missing_output"
+native_fallback_output=$(printf '{"command":"login"}\n' |
+  env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
+    "XDG_CONFIG_HOME=$runtime_config" "XDG_CACHE_HOME=$runtime_cache" \
+    "XDG_STATE_HOME=$runtime_state" "XDG_RUNTIME_DIR=$runtime_session" \
+    "OMARCHY_SPOTIFY_RUNTIME_DIR=$native_missing_dir" \
+    "$source_root/scripts/native-session.sh" 2>/dev/null) || native_fallback_status=$?
+[[ ${native_fallback_status:-0} -eq 7 ]]
+grep -q '"id":1' <<<"$native_fallback_output"
+
+# A plain removal moves the configuration aside and keeps plugin tokens and
+# the shared spotifyd cache.
+mkdir -p "$runtime_state/aria" "$runtime_cache/spotifyd"
+printf '%s\n' '{"token":"mock"}' >"$runtime_state/aria/refresh-token-mock"
+printf '%s\n' stale >"$runtime_cache/spotifyd/cached-file"
+env "${sandbox_env[@]}" \
+  "$source_root/scripts/remove-runtime.sh" >"$test_root/remove-plain.log"
+grep -q 'Moved configuration to:' "$test_root/remove-plain.log"
+find "$runtime_config" -maxdepth 1 -type d -name 'omarchy-spotify.bak.*' |
+  grep -q .
+[[ ! -e $runtime_backend/omarchy-spotify-backend ]]
+[[ -f $runtime_state/aria/refresh-token-mock ]]
+[[ -f $runtime_cache/spotifyd/cached-file ]]
+
+# A modified legacy unit file is never touched; only an exact byte match with
+# the last copy this plugin shipped may be disabled and deleted.
+mkdir -p "$runtime_config/systemd/user"
+printf '%s\n' 'stale unit' >"$runtime_config/systemd/user/omarchy-spotify.service"
 : >"$systemctl_log"
-PATH="$mock_bin:$PATH" \
-XDG_CONFIG_HOME="$runtime_config" \
-XDG_CACHE_HOME="$runtime_cache" \
-XDG_STATE_HOME="$runtime_state" \
-OMARCHY_SPOTIFY_RUNTIME_DIR="$runtime_backend" \
-CARGO_TARGET_DIR="$mock_target" \
-OMARCHY_SPOTIFY_BUILD_FROM_SOURCE=1 \
-TEST_SERVICE_ACTIVE=1 \
-TEST_SYSTEMCTL_LOG="$systemctl_log" \
-  "$source_root/scripts/setup.sh" >/dev/null
-installed_hash=$(sha256sum -- "$runtime_backend/omarchy-spotify-backend")
-source_build_hash=$(sha256sum -- "$mock_target/release/omarchy-spotify-backend")
-[[ ${installed_hash%% *} == "${source_build_hash%% *}" ]]
-cmp -s -- "$source_root/systemd/omarchy-spotify.service" "$runtime_backend_unit"
-PATH="$mock_bin:$PATH" \
-XDG_CONFIG_HOME="$runtime_config" \
-OMARCHY_SPOTIFY_RUNTIME_DIR="$runtime_backend" \
-  "$source_root/scripts/playback-runtime.sh" check
-grep -qx -- '--user restart omarchy-spotify.service' "$systemctl_log"
-
-: >"$systemctl_log"
-PATH="$mock_bin:$PATH" \
-XDG_CONFIG_HOME="$runtime_config" \
-XDG_CACHE_HOME="$runtime_cache" \
-XDG_STATE_HOME="$runtime_state" \
-OMARCHY_SPOTIFY_RUNTIME_DIR="$runtime_backend" \
-TEST_SERVICE_ACTIVE=1 \
-TEST_SYSTEMCTL_LOG="$systemctl_log" \
-  "$source_root/scripts/setup.sh" >/dev/null
-! grep -q -- '--user restart omarchy-spotify.service' "$systemctl_log"
-
 mkdir -p "$runtime_config/omarchy-spotify" \
   "$runtime_config/omarchy-spotify.bak.20260827000000" \
-  "$runtime_cache/spotifyd" "$runtime_cache/omarchy-spotify/target" \
+  "$runtime_cache/omarchy-spotify/target" \
+  "$runtime_state/omarchy-spotify" "$runtime_state/aria" \
   "$runtime_session/omarchy-spotify"
-cp -- "$source_root/config/spotifyd.conf" "$runtime_config/omarchy-spotify/spotifyd.conf"
+cp -- "$source_root/config/spotifyd.conf" \
+  "$runtime_config/omarchy-spotify/spotifyd.conf"
 printf '%s\n' stale >"$runtime_config/omarchy-spotify.bak.20260827000000/spotifyd.conf"
 printf '%s\n' stale >"$runtime_cache/omarchy-spotify/target/build-artifact"
+printf '%s\n' '{"token":"mock"}' >"$runtime_state/aria/refresh-token-mock"
 printf '%s\n' stale >"$runtime_session/omarchy-spotify/backend.sock"
-: >"$systemctl_log"
-PATH="$mock_bin:$PATH" \
-XDG_CONFIG_HOME="$runtime_config" \
-XDG_CACHE_HOME="$runtime_cache" \
-XDG_STATE_HOME="$runtime_state" \
-XDG_RUNTIME_DIR="$runtime_session" \
-OMARCHY_SPOTIFY_RUNTIME_DIR="$runtime_backend" \
-TEST_SECRET_LOG="$secret_log" \
-TEST_SYSTEMCTL_LOG="$systemctl_log" \
-  "$source_root/scripts/remove-runtime.sh" --purge >/dev/null
-
-[[ ! -e $runtime_config/omarchy-spotify && ! -e $runtime_cache/spotifyd ]]
+: >"$secret_log"
+env "${sandbox_env[@]}" \
+  "TEST_SECRET_LOG=$secret_log" \
+  "TEST_SYSTEMCTL_LOG=$systemctl_log" \
+  "$source_root/scripts/remove-runtime.sh" --purge \
+  >"$test_root/remove-purge.log" 2>"$test_root/remove-purge.err"
+[[ -f $runtime_config/systemd/user/omarchy-spotify.service ]]
+grep -q 'kept modified unit file' "$test_root/remove-purge.err"
+! grep -q -- '--user disable --now' "$systemctl_log"
+[[ ! -e $runtime_config/omarchy-spotify ]]
 [[ ! -e $runtime_config/omarchy-spotify.bak.20260827000000 ]]
 [[ ! -e $runtime_cache/omarchy-spotify ]]
 [[ ! -e $runtime_state/omarchy-spotify ]]
+[[ ! -e $runtime_state/aria ]]
 [[ ! -e $runtime_session/omarchy-spotify ]]
 [[ ! -e $runtime_backend ]]
-grep -qx -- '--user disable --now omarchy-spotify.service' "$systemctl_log"
-grep -qx -- '--user disable --now omarchy-spotifyd.service' "$systemctl_log"
-grep -q 'clear service quickshell-spotify kind refresh-token' "$secret_log"
+grep -q 'Removed plugin tokens and session state.' "$test_root/remove-purge.log"
+grep -q 'Removed spotifyd configuration.' "$test_root/remove-purge.log"
+grep -q 'Cleared matching Aria keyring entries.' "$test_root/remove-purge.log"
+grep -q 'clear service aria kind refresh-token' "$secret_log"
+# The shared spotifyd cache belongs to the spotifyd package, not this plugin.
+[[ -d $runtime_cache/spotifyd ]]
+grep -q 'Runtime integration removed' "$test_root/remove-purge.log"
 
+# A relative XDG path is refused before anything is touched.
 set +e
-PATH="$mock_bin:$PATH" \
-XDG_CACHE_HOME="relative-cache" \
+env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
+  XDG_CACHE_HOME="relative-cache" \
   "$source_root/scripts/remove-runtime.sh" --purge >/dev/null 2>&1
 unsafe_remove_status=$?
 set -e
 [[ $unsafe_remove_status -eq 3 ]]
 
-# The top-level uninstaller wraps the runtime purge, removes the plugin through
-# Omarchy, clears exact-ID backups, restarts the shell, and remains idempotent.
-plugin_dir="$runtime_home/.config/omarchy/plugins/quickshell.spotify"
-plugin_backup="$runtime_home/.config/omarchy/plugins/.quickshell.spotify.bak.20260827000000"
+# An undeletable plugin state dir turns into a failed purge with a clear
+# message and a distinct exit code.
+mkdir -p "$runtime_state/aria" "$runtime_config/omarchy-spotify"
+printf '%s\n' '{"token":"mock"}' >"$runtime_state/aria/refresh-token-mock"
+chmod 500 "$runtime_state/aria"
+set +e
+env "${sandbox_env[@]}" \
+  "TEST_SECRET_LOG=$secret_log" \
+  "$source_root/scripts/remove-runtime.sh" --purge \
+  >/dev/null 2>"$test_root/remove-failed.err"
+failed_purge_status=$?
+set -e
+chmod 755 "$runtime_state/aria"
+rm -rf -- "$runtime_state/aria"
+[[ $failed_purge_status -eq 4 ]]
+grep -q 'failed to remove plugin state' "$test_root/remove-failed.err"
+grep -q 'some plugin files could not be deleted' "$test_root/remove-failed.err"
+
+# The top-level uninstaller wraps the runtime purge, removes the plugin
+# through Omarchy, clears exact-ID backups, restarts the shell, and remains
+# idempotent.
+plugin_dir="$runtime_home/.config/omarchy/plugins/aria"
+plugin_backup="$runtime_home/.config/omarchy/plugins/.aria.bak.20260827000000"
 mkdir -p "$(dirname -- "$plugin_dir")" "$plugin_backup" \
-  "$runtime_config/omarchy-spotify" "$runtime_cache/spotifyd" \
-  "$runtime_state/omarchy-spotify" "$runtime_session/omarchy-spotify" \
-  "$runtime_backend"
+  "$runtime_config/omarchy-spotify" "$runtime_state/aria"
 ln -s -- "$source_root" "$plugin_dir"
-printf '%s\n' stale >"$runtime_backend/omarchy-spotify-backend"
+printf '%s\n' stale >"$runtime_config/omarchy-spotify/spotifyd.conf"
+printf '%s\n' stale >"$runtime_state/aria/refresh-token-mock"
 : >"$omarchy_log"
-(
-  cd "$test_root"
-  PATH="$mock_bin:$PATH" \
-  HOME="$runtime_home" \
-  XDG_CONFIG_HOME="$runtime_config" \
-  XDG_CACHE_HOME="$runtime_cache" \
-  XDG_STATE_HOME="$runtime_state" \
-  XDG_RUNTIME_DIR="$runtime_session" \
-  OMARCHY_SPOTIFY_RUNTIME_DIR="$runtime_backend" \
-  TEST_SECRET_LOG="$secret_log" \
-  TEST_SYSTEMCTL_LOG="$systemctl_log" \
-  TEST_OMARCHY_LOG="$omarchy_log" \
-    "$source_root/scripts/uninstall.sh" >/dev/null
-)
+env "${sandbox_env[@]}" \
+  "TEST_OMARCHY_LOG=$omarchy_log" \
+  "$source_root/scripts/uninstall.sh" >"$test_root/uninstall.log" 2>&1
 [[ ! -e $plugin_dir && ! -L $plugin_dir && ! -e $plugin_backup ]]
-[[ ! -e $runtime_config/omarchy-spotify && ! -e $runtime_cache/spotifyd ]]
-[[ ! -e $runtime_state/omarchy-spotify && ! -e $runtime_session/omarchy-spotify ]]
+[[ ! -e $runtime_config/omarchy-spotify ]]
+[[ ! -e $runtime_state/aria ]]
 [[ ! -e $runtime_backend ]]
-grep -qx 'plugin disable quickshell.spotify' "$omarchy_log"
-grep -qx 'plugin remove quickshell.spotify --yes' "$omarchy_log"
-grep -qx 'restart shell' "$omarchy_log"
+grep -q 'plugin disable aria' "$omarchy_log"
+grep -q 'plugin remove aria --yes' "$omarchy_log"
+grep -q 'restart shell' "$omarchy_log"
+grep -q 'completely uninstalled' "$test_root/uninstall.log"
 
-PATH="$mock_bin:$PATH" \
-HOME="$runtime_home" \
-XDG_CONFIG_HOME="$runtime_config" \
-XDG_CACHE_HOME="$runtime_cache" \
-XDG_STATE_HOME="$runtime_state" \
-XDG_RUNTIME_DIR="$runtime_session" \
-OMARCHY_SPOTIFY_RUNTIME_DIR="$runtime_backend" \
-TEST_SECRET_LOG="$secret_log" \
-TEST_SYSTEMCTL_LOG="$systemctl_log" \
-TEST_OMARCHY_LOG="$omarchy_log" \
-  "$source_root/scripts/uninstall.sh" >/dev/null
-[[ $(grep -c '^plugin remove quickshell.spotify --yes$' "$omarchy_log") -eq 1 ]]
+# A second run has nothing left to remove: no duplicate plugin removal.
+env "${sandbox_env[@]}" \
+  "TEST_OMARCHY_LOG=$omarchy_log" \
+  "$source_root/scripts/uninstall.sh" >/dev/null 2>&1
+[[ $(grep -c '^plugin remove aria --yes$' "$omarchy_log") -eq 1 ]]
 
-mkdir -p "$runtime_state/omarchy-spotify/oauth" "$runtime_cache/spotifyd/oauth"
-printf '%s\n' '{"mock":"credential"}' \
-  >"$runtime_state/omarchy-spotify/oauth/credentials.json"
-printf '%s\n' '{"mock":"legacy-credential"}' \
-  >"$runtime_cache/spotifyd/oauth/credentials.json"
-XDG_CACHE_HOME="$runtime_cache" \
-XDG_STATE_HOME="$runtime_state" \
-  "$source_root/scripts/playback-runtime.sh" credentials
-PATH="$mock_bin:$PATH" \
-XDG_CACHE_HOME="$runtime_cache" \
-XDG_STATE_HOME="$runtime_state" \
-  "$source_root/scripts/spotifyd-logout.sh"
-[[ ! -e $runtime_state/omarchy-spotify/oauth/credentials.json ]]
-[[ ! -e $runtime_cache/spotifyd/oauth/credentials.json ]]
-if XDG_CACHE_HOME="$runtime_cache" XDG_STATE_HOME="$runtime_state" \
-    "$source_root/scripts/playback-runtime.sh" credentials; then
-  echo "playback-runtime.sh reported removed credentials" >&2
+# Static checks keep the scripts honest about the current architecture.
+grep -q 'remove-runtime.sh.*--purge' "$source_root/scripts/uninstall.sh"
+grep -q 'omarchy plugin remove aria --yes' "$source_root/scripts/uninstall.sh"
+grep -q 'backend-verify.sh' "$source_root/scripts/native-session.sh"
+grep -q 'backend-verify.sh' "$source_root/scripts/setup.sh"
+grep -q '^## Remove it completely$' "$source_root/README.md"
+if grep -rn --exclude-dir=__pycache__ '/home/dann' "$source_root/scripts" \
+    "$source_root/Service.qml" "$source_root/BarWidget.qml" \
+    "$source_root/Panel.qml" "$source_root/Api.js"; then
+  echo "A hardcoded /home/dann path leaked into the plugin" >&2
   exit 1
 fi
-
-set +e
-PATH="$mock_bin:$PATH" \
-XDG_CACHE_HOME="relative-cache" \
-  "$source_root/scripts/spotifyd-logout.sh" >/dev/null 2>&1
-unsafe_logout_status=$?
-set -e
-[[ $unsafe_logout_status -eq 3 ]]
-
-handoff_hypr_log="$test_root/handoff-hypr.log"
-handoff_shell_log="$test_root/handoff-shell.log"
-printf '%s\n' \
-  '#!/bin/sh' \
-  'if [ "${1:-}" = "clients" ]; then printf "%s\n" "${TEST_CLIENTS_JSON:?}"; exit 0; fi' \
-  'printf "%s\n" "$*" >>"${TEST_HYPR_LOG:?}"' \
-  'exit 0' >"$mock_bin/hyprctl"
-printf '%s\n' \
-  '#!/bin/sh' \
-  'printf "%s\n" "$*" >>"${TEST_SHELL_LOG:?}"' \
-  'exit 0' >"$mock_bin/omarchy-shell"
-chmod 755 "$mock_bin/hyprctl" "$mock_bin/omarchy-shell"
-
-TEST_CLIENTS_JSON='[{"address":"0xabc","class":"chromium","title":"127.0.0.1:8000/login?code=mock - Chromium"},{"address":"0xdef","class":"org.quickshell","title":"Omarchy Spotify"}]' \
-TEST_HYPR_LOG="$handoff_hypr_log" \
-TEST_SHELL_LOG="$handoff_shell_log" \
-PATH="$mock_bin:$PATH" \
-  "$source_root/scripts/return-from-auth.sh"
-grep -q 'send_shortcut.*address:0xabc' "$handoff_hypr_log"
-grep -q 'focus.*address:0xdef' "$handoff_hypr_log"
-grep -q 'shell summon quickshell.spotify' "$handoff_shell_log"
-
-printf '' >"$handoff_hypr_log"
-TEST_CLIENTS_JSON='[{"address":"0xabc","class":"chromium","title":"Unrelated tab - Chromium"},{"address":"0xdef","class":"org.quickshell","title":"Omarchy Spotify"}]' \
-TEST_HYPR_LOG="$handoff_hypr_log" \
-TEST_SHELL_LOG="$handoff_shell_log" \
-PATH="$mock_bin:$PATH" \
-  "$source_root/scripts/return-from-auth.sh"
-! grep -q 'send_shortcut' "$handoff_hypr_log"
-
-grep -qx 'umask 077' "$source_root/scripts/spotifyd-auth.sh"
-[[ -x $source_root/scripts/setup-playback.sh ]]
-[[ -x $source_root/scripts/backend-source-id.sh ]]
-[[ -x $source_root/scripts/uninstall.sh ]]
-grep -q 'remove-runtime.sh.*--purge' "$source_root/scripts/uninstall.sh"
-grep -q 'omarchy plugin remove quickshell.spotify --yes' "$source_root/scripts/uninstall.sh"
-grep -q '^## Remove it completely$' "$source_root/README.md"
-grep -q -- '--require-native' \
-  "$source_root/scripts/setup-playback.sh"
-! grep -q 'sudo' "$source_root/scripts/setup-playback.sh"
-grep -q 'exec /usr/bin/spotifyd authenticate' \
-  "$source_root/scripts/spotifyd-auth.sh"
-grep -q 'omarchy-spotify-backend' "$source_root/scripts/spotifyd-auth.sh"
-grep -q -- '--config-path "$config_root/omarchy-spotify/spotifyd.conf"' \
-  "$source_root/scripts/spotifyd-auth.sh"
-grep -q -- '--oauth-port 8000' "$source_root/scripts/spotifyd-auth.sh"
 # The legacy OAuth component stays isolated; the app uses native login.
 grep -q 'property string clientId: ""' "$source_root/AuthManager.qml"
 ! grep -q 'd420a117a32841c2b3474932e49fb54b' "$source_root/AuthManager.qml"
@@ -527,7 +503,7 @@ if grep -E '^[[:space:]]*uses:' \
   echo "release-backend.yml contains a mutable action reference" >&2
   exit 1
 fi
-jq -e '.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$")
+jq -e '(.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))
   and .barWidget.defaultSection == "left"
   and .barWidget.defaults.showMiniPlayer == "On"
   and (.barWidget.schema[] | select(.key == "showMiniPlayer").defaultValue) == "On"
@@ -546,11 +522,5 @@ grep -qx 'section=left' "$source_root/scripts/install-local.sh"
 grep -qx 'bitrate = 320' "$source_root/config/spotifyd.conf"
 grep -qx 'no_audio_cache = false' "$source_root/config/spotifyd.conf"
 grep -qx 'max_cache_size = 1000000000' "$source_root/config/spotifyd.conf"
-grep -qx 'Conflicts=omarchy-spotifyd.service' \
-  "$source_root/systemd/omarchy-spotify.service"
-grep -qx 'Environment=PULSE_LATENCY_MSEC=30' \
-  "$source_root/systemd/omarchy-spotify.service"
-grep -qx 'Environment=TOKIO_WORKER_THREADS=2' \
-  "$source_root/systemd/omarchy-spotify.service"
 
 echo "Script tests passed."
