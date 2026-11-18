@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.9 (2026-11-18)
+
+- Keep the volume slider steady during Soloist playback: the displayed level now
+  comes from Soloist's own state and holds the requested value until the receiver
+  confirms it, instead of flickering to the stale level reported by the Web API
+  on its way to the new one.
+
+
 ## 1.2.8 (2026-11-18)
 
 - Fix the volume slider in the mini and full player during Soloist playback: volume

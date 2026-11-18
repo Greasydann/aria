@@ -237,6 +237,11 @@ Item {
   property var pendingRemoteSeek: null
   property var pendingRemoteVolume: null
   property real pendingSliderVolume: -1
+  // A volume command sent to Soloist, { percent, expiresAt }. Cloud playback
+  // state can lag behind the daemon for seconds and carries no volume for the
+  // receiver, so the slider keeps showing the requested level until Soloist
+  // itself reports it (or the grace expires).
+  property var soloistVolumeRequest: null
   property double pendingSliderUntil: 0
   property bool volumeFlushQueued: false
   property real queuedVolumeSlider: 0
@@ -320,10 +325,16 @@ Item {
     ? Math.max(0, Number(remoteTrack.durationMs) || 0) / 1000
     : (hasLocalPlayer && activePlayer.lengthSupported
       ? Math.max(0, Number(activePlayer.length) || 0) : 0)
-  readonly property real playbackVolume: useRemotePlayback && remoteDevice
-    ? displayedRemoteVolumePercent(remoteDevice) / 100
-    : (hasLocalPlayer && activePlayer.volumeSupported
-      ? Math.max(0, Math.min(1, Number(activePlayer.volume) || 0)) : 0)
+  // Soloist is the playback target: its own poll is the authoritative volume
+  // source. The Web API poll interleaves a receiver device without a volume,
+  // so deriving the slider from remoteDevice would bounce it to zero and back
+  // on every poll.
+  readonly property real playbackVolume: soloistTarget() && soloistPlayback
+    && soloistPlayback.device ? displayedSoloistVolume() / 100
+    : (useRemotePlayback && remoteDevice
+      ? displayedRemoteVolumePercent(remoteDevice) / 100
+      : (hasLocalPlayer && activePlayer.volumeSupported
+        ? Math.max(0, Math.min(1, Number(activePlayer.volume) || 0)) : 0))
   readonly property real reportedSliderVolume: useRemotePlayback
     ? playbackVolume : Api.spotifydVolumeToSlider(playbackVolume)
   readonly property real volume: pendingSliderVolume >= 0
@@ -1159,6 +1170,19 @@ Item {
     return rememberRemoteVolume(device, receiver.volumePercent, receiver.volumeObservedAt || 0)
   }
 
+  function displayedSoloistVolume() {
+    var reported = Api.normalizeVolumePercent(
+      soloistPlayback.device.volumePercent)
+    var request = soloistVolumeRequest
+    if (request && Date.now() < Number(request.expiresAt)) {
+      var requested = Api.normalizeVolumePercent(request.percent)
+      if (requested !== null
+          && (reported === null || Math.abs(reported - requested) > 0.5))
+        return Math.max(0, Math.min(100, Number(request.percent) || 0))
+    }
+    return reported === null ? 0 : reported
+  }
+
   function remoteControlDeviceSnapshot(device) {
     var item = device || {}
     return {
@@ -1255,8 +1279,12 @@ Item {
     }
     if (sendSonosControl("volume", String(Math.round(normalized * 100)))) return true
     if (soloistTarget()) {
-      // Soloist takes volume in percent; the pending-volume hold above is
-      // released when a soloist poll reports the new level.
+      // Soloist takes volume in percent; the slider keeps showing this level
+      // until a soloist poll reports it (displayedSoloistVolume).
+      soloistVolumeRequest = {
+        percent: Math.round(normalized * 100),
+        expiresAt: Date.now() + remoteControlGraceMs
+      }
       soloistCtl(["volume", String(Math.round(normalized * 100))])
       return true
     }
