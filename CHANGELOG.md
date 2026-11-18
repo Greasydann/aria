@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.1 (2026-11-18)
+
+- Fix setup.sh referencing files removed with the embedded engine (the
+  configure-spotifyd helper and the systemd units): setup now completes, and
+  the fallback config's device name is stamped inline.
+- Scope the uninstaller: only disable and remove a legacy unit that still
+  byte-matches the copy the plugin shipped, and never touch the shared
+  `~/.cache/spotifyd` directory owned by the spotifyd package.
+
 ## 1.2.0 (2026-11-18)
 
 - Choose the page the player opens on in Settings: For you, Liked Songs, Search,

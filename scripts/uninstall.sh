@@ -47,4 +47,5 @@ if command -v rg >/dev/null 2>&1 && [[ -d $hypr_config ]] \
 fi
 
 echo "Aria's plugin data and runtime have been completely uninstalled."
-echo "External source checkouts, other plugins, and the spotifyd package were left alone."
+echo "External source checkouts, other plugins, the spotifyd package, and its"
+echo "own cache were left alone."

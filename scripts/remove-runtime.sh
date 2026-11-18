@@ -18,7 +18,6 @@ session_runtime_root=${XDG_RUNTIME_DIR:-/tmp}
 backend_unit_file="$config_root/systemd/user/omarchy-spotify.service"
 fallback_unit_file="$config_root/systemd/user/omarchy-spotifyd.service"
 config_dir="$config_root/omarchy-spotify"
-cache_dir="$cache_root/spotifyd"
 build_cache_dir="$cache_root/omarchy-spotify"
 state_dir="$state_root/omarchy-spotify"
 session_runtime_dir="$session_runtime_root/omarchy-spotify"
@@ -47,14 +46,38 @@ if [[ ${runtime_dir##*/} == omarchy-spotify ]]; then
   runtime_dir_is_dedicated=1
 fi
 
-for unit_name in omarchy-spotify.service omarchy-spotifyd.service; do
-  systemctl --user disable --now "$unit_name" >/dev/null 2>&1 || true
-done
-rm -f -- "$backend_unit_file" "$fallback_unit_file" "$backend_binary" \
+# Legacy units from the embedded-engine generations of this plugin. Current
+# installs run the session backend on demand and never install a unit. Touch
+# a unit file only when it still byte-matches the last copy this plugin
+# shipped; a modified or foreign unit is left alone.
+removed_a_unit=0
+remove_legacy_unit() {
+  local unit_name=$1 expected_hash=$2 unit_path=$3
+  [[ -f $unit_path ]] || return 0
+  local actual_hash
+  actual_hash=$(sha256sum -- "$unit_path") || actual_hash=""
+  actual_hash=${actual_hash%% *}
+  if [[ $actual_hash == "$expected_hash" ]]; then
+    systemctl --user disable --now "$unit_name" >/dev/null 2>&1 || true
+    rm -f -- "$unit_path"
+    removed_a_unit=1
+  else
+    echo "remove-runtime.sh: kept modified unit file: $unit_path" >&2
+  fi
+}
+remove_legacy_unit omarchy-spotify.service \
+  b2d1f3f36ffc518cd1735f7b1b0f4281d092f0157b2b4bffdc78d720dbe70c27 \
+  "$backend_unit_file"
+remove_legacy_unit omarchy-spotifyd.service \
+  2640dc442c5fea7c7765a02154db297b58751c8daefe8021a8b8a9f85eb6a8c8 \
+  "$fallback_unit_file"
+rm -f -- "$backend_binary" \
   "$backend_source_id_file" "$backend_binary_hash_file" "$backend_origin_file"
-systemctl --user daemon-reload
-systemctl --user reset-failed omarchy-spotify.service omarchy-spotifyd.service \
-  >/dev/null 2>&1 || true
+if (( removed_a_unit )); then
+  systemctl --user daemon-reload
+  systemctl --user reset-failed omarchy-spotify.service omarchy-spotifyd.service \
+    >/dev/null 2>&1 || true
+fi
 
 if [[ -d $config_dir ]]; then
   if (( purge )); then
@@ -69,11 +92,6 @@ if [[ -d $config_dir ]]; then
 fi
 
 if (( purge )); then
-  if [[ -d $cache_dir ]]; then
-    [[ $cache_dir == "$cache_root/spotifyd" ]] || exit 3
-    rm -rf -- "$cache_dir"
-    echo "Removed spotifyd cached credentials and audio."
-  fi
   if [[ -d $build_cache_dir ]]; then
     [[ $build_cache_dir == "$cache_root/omarchy-spotify" ]] || exit 3
     rm -rf -- "$build_cache_dir"
@@ -114,4 +132,4 @@ else
   rmdir -- "$runtime_dir" 2>/dev/null || true
 fi
 
-echo "Runtime integration removed. The spotifyd package was left installed."
+echo "Runtime integration removed. The spotifyd package and its own cache were left alone."
