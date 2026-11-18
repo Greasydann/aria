@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.2 (2026-11-18)
+
+- setup.sh no longer rewrites an existing spotifyd fallback configuration
+  unless `--force-config` is passed. The device name is stamped into a private
+  copy of the template before installing it, so custom device names survive
+  re-runs and dotfiles symlinks are never followed or written through.
+
 ## 1.2.1 (2026-11-18)
 
 - Fix setup.sh referencing files removed with the embedded engine (the

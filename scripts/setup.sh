@@ -119,6 +119,11 @@ fi
 
 install -d -m 700 -- "$config_dir"
 
+# Existing configurations are left byte-identical unless --force-config asks
+# for a refresh. Fresh and forced installs generate a private copy of the
+# template first (stamping the device name into the copy, never the template),
+# then replace the path itself, so a dotfiles symlink is never followed and
+# its target is never written through.
 if [[ -f $config_file && $force_config -eq 0 ]]; then
   echo "Keeping existing configuration: $config_file"
 else
@@ -127,28 +132,25 @@ else
     cp -p -- "$config_file" "$backup"
     echo "Backed up previous configuration to: $backup"
   fi
-  install -m 600 -- "$source_root/config/spotifyd.conf" "$config_file"
-fi
-
-# The dormant spotifyd fallback config should advertise the device name the
-# plugin expects. The embedded-engine helper that did this is gone, so stamp
-# the name inline, refusing anything that could break the conf format.
-if [[ -n $device_name && ${#device_name} -le 64 ]] \
-    && [[ $device_name != *[\"\\]* ]] \
-    && [[ ! $device_name =~ [^[:print:]] ]]; then
-  temporary=$(mktemp "$config_file.tmp.XXXXXX")
-  awk -v name="$device_name" '
-    /^device_name[[:space:]]*=/ { print "device_name = \"" name "\""; next }
-    { print }
-  ' "$config_file" > "$temporary"
-  cat -- "$temporary" > "$config_file"
-  rm -f -- "$temporary"
-else
-  echo "setup.sh: keeping the template device name; the configured name is not conf-safe" >&2
+  generated=$(mktemp "$config_file.generated.XXXXXX")
+  if [[ -n $device_name && ${#device_name} -le 64 ]] \
+      && [[ $device_name != *[\"\\]* ]] \
+      && [[ ! $device_name =~ [^[:print:]] ]]; then
+    awk -v name="$device_name" '
+      /^device_name[[:space:]]*=/ { print "device_name = \"" name "\""; next }
+      { print }
+    ' "$source_root/config/spotifyd.conf" > "$generated"
+  else
+    echo "setup.sh: keeping the template device name; the configured name is not conf-safe" >&2
+    cp -- "$source_root/config/spotifyd.conf" "$generated"
+  fi
+  rm -f -- "$config_file"
+  install -m 600 -- "$generated" "$config_file"
+  rm -f -- "$generated"
+  echo "Installed private config: $config_file"
 fi
 
 if (( backend_ready )); then
   echo "Session backend ready: $backend_binary"
 fi
-echo "Installed private config: $config_file"
 echo "Playback remains stopped and will be started on demand by the plugin."
