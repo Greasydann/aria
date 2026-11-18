@@ -3,7 +3,7 @@
   "id": "aria",
   "name": "Aria",
   "version": "1.2.0",
-  "author": "stappmus",
+  "author": "Dann",
   "license": "MIT",
   "description": "Aria: a Spotify player for Omarchy in the spirit of quickshell.spotify, with local playback via Soloist.",
   "kinds": [
@@ -52,7 +52,6 @@
         "defaultValue": "Aria",
         "description": "Shown in Devices immediately. Spotify Connect uses the new name the next time local playback starts."
       },
-      
       {
         "key": "showMiniPlayer",
         "type": "enum",
@@ -177,7 +176,6 @@
         "defaultValue": "Off",
         "description": "When on, the bar label always reserves the maximum width while a track is shown, so neighbouring widgets do not shift between songs. Unavailable while the width is unlimited."
       },
-      
       {
         "key": "showArtwork",
         "type": "enum",
