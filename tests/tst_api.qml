@@ -1949,6 +1949,17 @@ TestCase {
     compare(Api.resumePlaybackAvailable(false, { item: { uri: "" } }), false)
   }
 
+  function test_normalizedLandingPage_keepsKnownPages() {
+    compare(Api.normalizedLandingPage("home"), "home")
+    compare(Api.normalizedLandingPage("liked"), "liked")
+    compare(Api.normalizedLandingPage("search"), "search")
+    compare(Api.normalizedLandingPage("playlists"), "playlists")
+    compare(Api.normalizedLandingPage("playlist"), "playlist")
+    compare(Api.normalizedLandingPage(""), "liked")
+    compare(Api.normalizedLandingPage("nonsense"), "liked")
+    compare(Api.normalizedLandingPage(undefined), "liked")
+  }
+
   function test_payloadDetailItem_fillsWhatThePageBinds() {
     // The mini player sends only type/id/name; the detail page binds uri,
     // subtitle, artists and imageUrl before the metadata request lands.

@@ -117,8 +117,9 @@ are accepted once and migrated so clearing disposable caches cannot deauthorize
 this computer. Player preferences (filters, search history, scroll positions,
 and similar) are written to `$XDG_STATE_HOME/aria/session.json` so they do not
 pollute Omarchy's `shell.json`. The last page is not part of that state: the
-player always opens on Liked Songs, and only an explicit payload (an artist or
-album link) selects a different page. Older copies kept as plugin settings
+player opens on the landing page chosen in Settings (For you, Liked Songs,
+Search, Playlists, or one playlist; Liked Songs by default), and only an
+explicit payload (an artist or album link) selects a different page. Older copies kept as plugin settings
 are read once and removed from `shell.json` after that file is written.
 Short-lived access tokens and PKCE values remain in the shell process. OAuth
 state is checked, callback listeners bind explicitly to IPv4 loopback, API URLs

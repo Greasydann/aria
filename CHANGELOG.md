@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Choose the page the player opens on in Settings: For you, Liked Songs, Search,
+  Playlists, or a specific playlist. Artist, album and playlist links still open
+  their own page.
+- Fix a settings race where the shell's pre-write config snapshot could undo a
+  just-saved preference on its way back through the bar widget.
+
 ## 1.0.0 (2026-11-17) — Aria
 
 - First Aria release. Aria is a fork of Omarchy Spotify, renamed and reshaped

@@ -36,9 +36,9 @@ Item {
   property bool lyricsViewOpen: false
   property string searchType: "track"
   property string libraryType: "tracks"
-  // The player always opens on this page. Detail pages are shown only when a
-  // surface explicitly asks for one (mini-player byline, notification, ...),
-  // so closing and reopening never drops you on a random last page.
+  // Fallback when no landing preference is stored yet. Detail pages are shown
+  // only when a surface explicitly asks for one (mini-player byline,
+  // notification, ...), so closing and reopening never restores a random page.
   readonly property string defaultTab: "library"
   property string homeType: "recent"
   property string libraryFilter: ""
@@ -66,6 +66,9 @@ Item {
 
   property string draftClientId: ""
   property string draftDeviceName: "Spoty"
+  property string draftLandingPage: "liked"
+  property string draftLandingPlaylistId: ""
+  property string draftLandingPlaylistName: ""
   property bool draftShowMiniPlayer: true
   property bool draftShowArtwork: true
   property bool draftShowVinylRecord: false
@@ -201,6 +204,9 @@ Item {
     if (!service) return
     draftClientId = String(service.settings.clientId || "")
     draftDeviceName = service.deviceName
+    draftLandingPage = service.landingPage
+    draftLandingPlaylistId = service.landingPlaylistId
+    draftLandingPlaylistName = service.landingPlaylistName
     draftShowMiniPlayer = service.showMiniPlayer
     draftShowArtwork = service.artworkEnabled
     draftShowVinylRecord = service.showVinylRecord
@@ -219,7 +225,7 @@ Item {
   function saveSettings(showStatus) {
     if (!service) return
     var values = {
-      deviceName: String(draftDeviceName || "").trim() || "Spoty",
+      deviceName: String(draftDeviceName || "").trim() || "Aria",
       showMiniPlayer: draftShowMiniPlayer ? "On" : "Off",
       showArtwork: draftShowArtwork ? "On" : "Off",
       showVinylRecord: draftShowVinylRecord ? "On" : "Off",
@@ -233,6 +239,10 @@ Item {
       scrollSpeed: Api.normalizedScrollSpeed(draftScrollSpeed),
       maxBarTextWidth: Api.normalizedMaxBarTextWidth(draftMaxBarTextWidth),
       fixedBarWidth: draftFixedBarWidth ? "On" : "Off",
+      landingPage: draftLandingPage === "playlist" && draftLandingPlaylistId
+        ? "playlist" : draftLandingPage,
+      landingPlaylistId: String(draftLandingPlaylistId || "").trim(),
+      landingPlaylistName: String(draftLandingPlaylistName || "").trim(),
       clientId: String(draftClientId || "").trim().toLowerCase()
     }
     service.persistSettings(values)
@@ -1839,17 +1849,34 @@ Item {
     lyricsViewOpen = !lyricsViewOpen
   }
 
-  // Reset to the fixed landing page. Filters, sorting and scroll memory are
-  // cleared too, so every open starts from the same resting state.
+  // Reset to the configured landing page. Filters, sorting and scroll memory
+  // are cleared too, so every open starts from the same resting state.
   function openDefaultPage() {
-    currentTab = defaultTab
-    libraryType = "tracks"
-    libraryFilter = ""
-    librarySort = "default"
+    var page = service ? service.landingPage : defaultTab
     searchText = ""
     universalSearchActive = false
     searchInContext = true
     navigationStack = []
+    if (page === "home") {
+      currentTab = "home"
+      homeFilter = ""
+      rememberScroll("home:" + homeType, 0)
+      return
+    }
+    if (page === "search") {
+      currentTab = "search"
+      return
+    }
+    if (page === "playlists" || page === "playlist") {
+      currentTab = "playlists"
+      playlistFilter = ""
+      playlistSort = "default"
+      return
+    }
+    currentTab = "library"
+    libraryType = "tracks"
+    libraryFilter = ""
+    librarySort = "default"
     rememberScroll("library:tracks", 0)
   }
 
@@ -1866,6 +1893,7 @@ Item {
     // Session state holds preferences (filters, scroll memory, the selected
     // playlist) but the last page is deliberately not restored.
     restoreUiState()
+    var landingOpen = false
     if (requestedDetail) {
       currentTab = "detail"
       navigationStack = []
@@ -1875,8 +1903,10 @@ Item {
       detailFilter = ""
     } else if (["home", "discover", "search", "library", "playlists", "queue", "devices", "setup"].indexOf(requestedTab) >= 0)
       currentTab = requestedTab
-    else
+    else {
       openDefaultPage()
+      landingOpen = true
+    }
     if (accountConnected) {
       openedForLogin = false
     } else if (!sessionPending) {
@@ -1899,6 +1929,9 @@ Item {
       service.setUiVisible("full-panel", true)
       service.activate(currentTab)
       restorePlaylistSelection()
+      if (landingOpen && service.landingPage === "playlist")
+        service.openLandingPlaylist(service.landingPlaylistId,
+          service.landingPlaylistName)
       if (currentTab === "detail" && requestedDetail)
         service.openDetail(requestedDetail)
       if (currentTab === "search" && Api.searchNeedsLoad(searchText,
@@ -2143,6 +2176,45 @@ Item {
       })
     }
     return options
+  }
+
+  // Landing-page playlist picker: the playlist browser plus one option per
+  // playlist. The stored choice stays visible even before the list loads.
+  function landingPlaylistOptions() {
+    var options = [{ value: "", label: "Playlist list",
+      description: "Browse all your playlists" }]
+    var list = playlistOptions()
+    var found = false
+    for (var i = 0; i < list.length; i++) {
+      options.push(list[i])
+      if (String(list[i].value) === draftLandingPlaylistId) found = true
+    }
+    if (!found && draftLandingPlaylistId)
+      options.push({ value: draftLandingPlaylistId,
+        label: draftLandingPlaylistName || "Saved playlist", description: "" })
+    return options
+  }
+
+  function chooseLandingPage(page) {
+    draftLandingPage = page
+    if (page !== "playlist") {
+      draftLandingPlaylistId = ""
+      draftLandingPlaylistName = ""
+    }
+    persistDraftSettings()
+  }
+
+  function chooseLandingPlaylist(value) {
+    var id = String(value || "")
+    if (!id) {
+      chooseLandingPage("playlists")
+      return
+    }
+    var playlist = service ? service.playlistById(id) : null
+    draftLandingPage = "playlist"
+    draftLandingPlaylistId = id
+    draftLandingPlaylistName = playlist ? String(playlist.name || "") : ""
+    persistDraftSettings()
   }
 
   // Accounts without a chosen display name report their raw base62 user
@@ -6543,10 +6615,96 @@ Item {
               Text {
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: "The client ID of your Spotify app from developer.spotify.com. Spoty uses it only to sign in for listening history and top rankings; the token stays on this machine. Everything else runs without it."
+                text: "The client ID of your Spotify app from developer.spotify.com. Aria uses it only to sign in for listening history and top rankings; the token stays on this machine. Everything else runs without it."
                 color: root.muted
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
+              }
+            }
+
+            Column {
+              width: parent.width
+              spacing: Style.space(6)
+
+              Text {
+                text: "LANDING PAGE"
+                color: root.muted
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.bold: true
+              }
+
+              Flow {
+                width: parent.width
+                spacing: Style.space(4)
+
+                Button {
+                  text: "For you"
+                  iconText: "󰋙"
+                  foreground: root.foreground
+                  selected: root.draftLandingPage === "home"
+                  tooltipText: "Open the player on For you"
+                  onClicked: root.chooseLandingPage("home")
+                }
+
+                Button {
+                  text: "Liked Songs"
+                  iconText: "󰋑"
+                  foreground: root.foreground
+                  selected: root.draftLandingPage === "liked"
+                  tooltipText: "Open the player on your Liked Songs"
+                  onClicked: root.chooseLandingPage("liked")
+                }
+
+                Button {
+                  text: "Search"
+                  iconText: "󰍉"
+                  foreground: root.foreground
+                  selected: root.draftLandingPage === "search"
+                  tooltipText: "Open the player on Search"
+                  onClicked: root.chooseLandingPage("search")
+                }
+
+                Button {
+                  text: "Playlists"
+                  iconText: "󰕄"
+                  foreground: root.foreground
+                  selected: root.draftLandingPage === "playlists"
+                    || root.draftLandingPage === "playlist"
+                  tooltipText: "Open the player on Playlists"
+                  onClicked: root.chooseLandingPage("playlists")
+                }
+              }
+
+              SearchableDropdown {
+                width: parent.width
+                visible: root.draftLandingPage === "playlists"
+                  || root.draftLandingPage === "playlist"
+                label: "PLAYLIST"
+                foreground: root.foreground
+                background: root.background
+                accent: root.accent
+                fontFamily: root.fontFamily
+                placeholderText: "Playlist list"
+                emptyText: root.service && root.service.playlistsLoading
+                  ? "Loading playlists…" : "No playlists found"
+                options: root.landingPlaylistOptions()
+                value: root.draftLandingPage === "playlist"
+                  ? root.draftLandingPlaylistId : ""
+                onPopupOpenChanged: {
+                  if (popupOpen && root.service)
+                    root.service.ensureAllPlaylists()
+                }
+                onChanged: function(value) { root.chooseLandingPlaylist(value) }
+              }
+
+              Text {
+                width: parent.width
+                text: "Where the player opens when you start it. Artist, album and playlist links still open their own page."
+                color: root.muted
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                wrapMode: Text.WordWrap
               }
             }
 
@@ -6655,7 +6813,7 @@ Item {
                 foreground: root.foreground
                 selected: root.draftShowLyrics
                 tooltipText: root.draftShowLyrics
-                  ? "Show the Omasing lyrics button in the player and mini-player"
+                  ? "Show the lyrics button in the full player and mini-player"
                   : "Hide the lyrics button and disable Ctrl+Shift+L"
                 onClicked: {
                   root.draftShowLyrics = !root.draftShowLyrics
@@ -6665,7 +6823,7 @@ Item {
 
               Text {
                 width: parent.width
-                text: "Hide the lyrics button if you do not use Omasing. Playback is unaffected, and the button returns whenever you turn this back on."
+                text: "Hide the lyrics button if you do not use lyrics. Playback is unaffected, and the button returns whenever you turn this back on."
                 color: root.muted
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.bodySmall

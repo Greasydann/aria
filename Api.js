@@ -420,6 +420,14 @@ function normalizedShortcutPlayer(value) {
   return "Omarchy Music app"
 }
 
+// Pages the full player can open on. "playlist" means a named playlist from
+// landingPlaylistId; "playlists" is the playlist browser.
+function normalizedLandingPage(value) {
+  var page = String(value || "").trim()
+  return ["home", "liked", "search", "playlists", "playlist"].indexOf(page) >= 0
+    ? page : "liked"
+}
+
 function normalizedShortcutHints(value) {
   return String(value || "On") === "Off" ? "Off" : "On"
 }

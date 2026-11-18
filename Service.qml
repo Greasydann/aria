@@ -53,13 +53,18 @@ Item {
     scrollSpeed: "1",
     maxBarTextWidth: "240",
     fixedBarWidth: "Off",
-    audioQuality: "320 kbps",
+    landingPage: "liked",
+    landingPlaylistId: "",
+    landingPlaylistName: "",
     clientId: ""
   })
   property var settings: Api.shallowCopy(defaultSettingValues)
   property bool settingsReady: false
 
   readonly property string deviceName: String(settings.deviceName || "Aria").trim() || "Aria"
+  readonly property string landingPage: Api.normalizedLandingPage(settings.landingPage)
+  readonly property string landingPlaylistId: String(settings.landingPlaylistId || "").trim()
+  readonly property string landingPlaylistName: String(settings.landingPlaylistName || "").trim()
   readonly property string soloistDeviceName: "Aria"
   readonly property var soloistDeviceNames: ["Aria", "Spoty", "Spotty", "SoloistPC", "OmaSpotify (this PC)"]
 
@@ -619,7 +624,8 @@ Item {
     var keys = ["deviceName", "showMiniPlayer",
       "showVinylRecord", "shortcutPlayer", "shortcutHints", "showLyrics", "showArtwork", "showTrackTitle", "showArtistName",
       "showPausedTrack", "scrollBarText", "scrollSpeed", "maxBarTextWidth",
-      "fixedBarWidth", "clientId"]
+      "fixedBarWidth", "landingPage", "landingPlaylistId",
+      "landingPlaylistName", "clientId"]
     for (var i = 0; i < keys.length; i++) {
       var key = keys[i]
       if (source[key] !== undefined) next[key] = source[key]
@@ -643,9 +649,12 @@ Item {
     if (Number(next.maxBarTextWidth) === 0) next.scrollBarText = "Off"
     next.fixedBarWidth = String(next.fixedBarWidth || "Off") === "On" ? "On" : "Off"
     if (Number(next.maxBarTextWidth) === 0) next.fixedBarWidth = "Off"
-    var quality = String(next.audioQuality || "320 kbps")
-    next.audioQuality = quality.indexOf("96") === 0 ? "96 kbps"
-      : (quality.indexOf("160") === 0 ? "160 kbps" : "320 kbps")
+    next.landingPage = Api.normalizedLandingPage(next.landingPage)
+    next.landingPlaylistId = String(next.landingPlaylistId || "").trim()
+    next.landingPlaylistName = String(next.landingPlaylistName || "").trim()
+    // A specific landing playlist needs an id; otherwise show the list.
+    if (next.landingPage === "playlist" && !next.landingPlaylistId)
+      next.landingPage = "playlists"
     // A personal Spotify client ID opts out of the shared rate-limit bucket.
     // Preserve invalid input so authentication can explain how to correct it.
     var customClientId = String(next.clientId || "").trim()
@@ -673,10 +682,20 @@ Item {
     return result
   }
 
+  // Writing an entry makes the shell re-broadcast config. Those broadcasts can
+  // still carry the pre-write snapshot, which would undo the change we just
+  // saved (it arrives right after updateEntryInline, before the new entry is
+  // visible). Ignore config pushes for a moment after a local write; the next
+  // authoritative reload happens well after this window.
+  property double settingsLocalWriteAt: 0
+  property bool applyingLocalSettings: false
+
   function applySettings(values) {
     // Empty pushes from newly constructed monitor widgets are not resets.
     // An authoritative layout entry (including id-only defaults) is accepted.
     if (!values || Object.keys(values).length === 0) return
+    if (!applyingLocalSettings && settingsLocalWriteAt > 0
+        && Date.now() - settingsLocalWriteAt < 2000) return
     var previousDeviceName = deviceName
     var next = normalizedSettings(values)
     if (JSON.stringify(next) !== JSON.stringify(settings)) settings = next
@@ -688,7 +707,10 @@ Item {
 
   function persistSettings(values) {
     var next = normalizedSettings(Api.assign(Api.shallowCopy(settings), values))
+    applyingLocalSettings = true
     applySettings(next)
+    applyingLocalSettings = false
+    settingsLocalWriteAt = Date.now()
     settingsReady = true
     if (shell && typeof shell.updateEntryInline === "function")
       shell.updateEntryInline(pluginId, next)
@@ -1949,6 +1971,39 @@ Item {
     var value = String(kind || "tracks")
     if (append !== true && force !== true && libraryLoaded(value)) return
     loadLibraryCollection(value, append === true)
+  }
+
+  // Open the playlist chosen as the landing page. The sidebar list loads
+  // asynchronously, so fall back to a direct request when the playlist is not
+  // cached yet.
+  function openLandingPlaylist(id, name, callback) {
+    var key = String(id || "").trim()
+    if (!key) {
+      if (typeof callback === "function") callback(null)
+      return
+    }
+    var cached = playlistById(key)
+    if (cached) {
+      openPlaylist(cached)
+      if (typeof callback === "function") callback(cached)
+      return
+    }
+    spotifyApi.request("GET", "/playlists/" + encodeURIComponent(key), null, null,
+      function(status, payload, error) {
+        if (error) {
+          root.fail(error)
+          if (typeof callback === "function") callback(null)
+          return
+        }
+        var playlist = Api.normalizePlaylist(payload, 128)
+        if (!playlist) {
+          if (typeof callback === "function") callback(null)
+          return
+        }
+        root.playlists = Api.mergeUnique(root.playlists, [playlist])
+        root.openPlaylist(playlist)
+        if (typeof callback === "function") callback(playlist)
+      })
   }
 
   function openPlaylist(playlist, restoredItemCount) {
