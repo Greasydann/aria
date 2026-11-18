@@ -766,12 +766,38 @@ Item {
     panelRestoreTimer.restart()
   }
 
+  property int panelRestoreTries: 0
+  property bool panelRestoreDone: false
+
   function restoreOpenPanel() {
+    if (panelRestoreDone) return
     var state = sessionState || ({})
-    if (state.playerOpen !== true) return
+    if (state.playerOpen !== true) {
+      panelRestoreDone = true
+      return
+    }
     var seenAt = Number(state.playerSeenAt || 0)
-    if (!(seenAt > 0) || Date.now() - seenAt > panelRestoreWindowMs) return
-    if (shell && typeof shell.summon === "function") shell.summon(pluginId, "{}")
+    if (!(seenAt > 0) || Date.now() - seenAt > panelRestoreWindowMs) {
+      panelRestoreDone = true
+      return
+    }
+    if (!shell || typeof shell.summon !== "function") return
+    // The panel may already have been opened by the user before the shell
+    // finished loading its plugins; do not summon a second instance.
+    if (typeof shell.isPluginOpen === "function" && shell.isPluginOpen(pluginId)) {
+      panelRestoreDone = true
+      return
+    }
+    var payload = ({})
+    var workspace = String(state.playerWorkspace || "")
+    if (workspace) payload.restoreWorkspace = workspace
+    if (shell.summon(pluginId, JSON.stringify(payload))) {
+      panelRestoreDone = true
+      return
+    }
+    panelRestoreTries++
+    if (panelRestoreTries > 40) panelRestoreDone = true
+    else panelRestoreRetryTimer.restart()
   }
 
   // A hidden panel that was not closed explicitly stays "open" until this
@@ -4263,7 +4289,14 @@ Item {
 
   Timer {
     id: panelRestoreTimer
-    interval: 4000
+    interval: 150
+    repeat: false
+    onTriggered: root.restoreOpenPanel()
+  }
+
+  Timer {
+    id: panelRestoreRetryTimer
+    interval: 250
     repeat: false
     onTriggered: root.restoreOpenPanel()
   }

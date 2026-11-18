@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import Quickshell
+import Quickshell.Hyprland
 import qs.Commons
 import qs.Commons as Theme
 import qs.Ui
@@ -19,6 +20,12 @@ Item {
   // close action). A shell restart destroys the panel without this flag, which
   // is what lets the service reopen it afterwards.
   property bool playerClosedByUser: false
+  // Workspace the full player lives on. Remembered in the session so a shell
+  // restart puts the new window back where it was, not on the workspace the
+  // user happens to be viewing when the restart happens.
+  property string playerWorkspace: ""
+  property string restoreWorkspace: ""
+  property int restoreWindowTries: 0
   property bool escapeCloseArmed: false
   property real volumeBeforeMute: 0.5
   property double lastVolumeAdjustAt: 0
@@ -518,8 +525,72 @@ Item {
       selectedPlaylistItemCount: selectedItemCount,
       lastRadioPlaylist: service.lastRadioPlaylist,
       playerOpen: opened && !playerClosedByUser,
-      playerSeenAt: Date.now()
+      playerSeenAt: Date.now(),
+      playerWorkspace: playerWorkspace
     })
+  }
+
+  // Track the actual window, so moving it to another workspace survives a
+  // later shell restart too.
+  function syncPlayerWorkspace() {
+    if (!service || !opened) return
+    Hyprland.refreshToplevels()
+    var windows = Hyprland.toplevels ? Hyprland.toplevels.values : []
+    for (var i = 0; i < windows.length; i++) {
+      var window = windows[i]
+      if (!window || String(window.title || "") !== "Aria — Spotify") continue
+      var workspace = window.workspace ? String(window.workspace.id) : ""
+      if (workspace && workspace !== playerWorkspace) {
+        playerWorkspace = workspace
+        persistUiState()
+      }
+      return
+    }
+  }
+
+  // Move a freshly restored window back to its old workspace without taking
+  // the user there. The window may take a few IPC ticks to appear.
+  function placeRestoredWindow() {
+    if (!restoreWorkspace) {
+      restoreMoveTimer.stop()
+      return
+    }
+    Hyprland.refreshToplevels()
+    var windows = Hyprland.toplevels ? Hyprland.toplevels.values : []
+    for (var i = 0; i < windows.length; i++) {
+      var window = windows[i]
+      if (!window || String(window.title || "") !== "Aria — Spotify") continue
+      // Hyprland's IPC model reports addresses without the 0x prefix that
+      // the window selector needs.
+      var address = String(window.address || "")
+      if (address && address.indexOf("0x") !== 0) address = "0x" + address
+      Hyprland.dispatch('hl.dsp.window.move({ workspace = "'
+        + String(restoreWorkspace) + '", follow = false, window = "address:'
+        + address + '" })')
+      restoreMoveTimer.stop()
+      restoreWorkspace = ""
+      return
+    }
+    restoreWindowTries++
+    if (restoreWindowTries > 40) {
+      restoreMoveTimer.stop()
+      restoreWorkspace = ""
+    }
+  }
+
+  Timer {
+    id: playerWorkspaceTimer
+    interval: 1000
+    running: root.opened
+    repeat: true
+    onTriggered: root.syncPlayerWorkspace()
+  }
+
+  Timer {
+    id: restoreMoveTimer
+    interval: 50
+    repeat: true
+    onTriggered: root.placeRestoredWindow()
   }
 
   function restorePlaylistSelection() {
@@ -1899,6 +1970,15 @@ Item {
     // Session state holds preferences (filters, scroll memory, the selected
     // playlist) but the last page is deliberately not restored.
     restoreUiState()
+    var targetWorkspace = String(payload.restoreWorkspace || "")
+    restoreWorkspace = targetWorkspace
+    if (targetWorkspace) {
+      playerWorkspace = targetWorkspace
+    } else {
+      restoreMoveTimer.stop()
+    }
+    if (!playerWorkspace && Hyprland.focusedWorkspace)
+      playerWorkspace = String(Hyprland.focusedWorkspace.id || "")
     var landingOpen = false
     if (requestedDetail) {
       currentTab = "detail"
@@ -1924,6 +2004,8 @@ Item {
     closingFromHost = false
     playerClosedByUser = false
     opened = true
+    restoreWindowTries = 0
+    if (restoreWorkspace) restoreMoveTimer.restart()
     persistUiState()
     lyricsViewOpen = payload.lyrics === true && service
       && service.lyricsAvailable
@@ -1952,6 +2034,8 @@ Item {
   }
 
   function close() {
+    restoreWorkspace = ""
+    restoreMoveTimer.stop()
     playerClosedByUser = true
     opened = false
     persistUiState()
@@ -3130,6 +3214,10 @@ Item {
     FocusScope {
       id: focusScope
       anchors.fill: parent
+      // A restored window is born on whichever workspace the user is viewing.
+      // Hide its contents until it has been moved back to its own workspace,
+      // so a restart never flashes a copy on the wrong one.
+      opacity: root.restoreWorkspace !== "" ? 0 : 1
       focus: true
       Keys.priority: Keys.BeforeItem
       onActiveFocusChanged: if (!activeFocus) {

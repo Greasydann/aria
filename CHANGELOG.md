@@ -10,8 +10,12 @@
 - Cache artwork on disk with HTTP/1.1 instead of relying on Qt's HTTP/2 image
   loader, which Spotify's CDN intermittently drops. Covers now survive shell
   restarts and appear immediately; remote URLs remain a seamless fallback.
-- Reopen the full player after the Omarchy shell restarts while it was open.
-  Explicit closes (bar icon, Escape, the close button) stay closed, and a
+- Reopen the full player after the Omarchy shell restarts while it was open,
+  on the workspace it was on before the restart. The user's current workspace
+  is never switched, and the restored window is hidden until it has been moved
+  back, so there is no flash on the wrong workspace. Restore now starts as soon
+  as the shell is ready instead of four seconds later.
+- Explicit closes (bar icon, Escape, the close button) stay closed, and a
   login hours later does not reopen a panel left open in the previous session.
 
 ## 1.0.0 (2026-11-17) — Aria

@@ -120,8 +120,11 @@ pollute Omarchy's `shell.json`. The last page is not part of that state: the
 player opens on the landing page chosen in Settings (For you, Liked Songs,
 Search, Playlists, or one playlist; Liked Songs by default), and only an
 explicit payload (an artist or album link) selects a different page. The
-record also notes whether the full player was open, with a short heartbeat, so
-a shell restart can reopen it while a later login stays closed. Older copies kept as plugin settings
+record also notes whether the full player was open and which Hyprland
+workspace it occupied, with a short heartbeat, so a shell restart can reopen
+it in place while a later login stays closed. The restored window is moved with
+`follow = false` and hidden until the move completes, so the user's workspace
+never changes and no copy flashes on the wrong one. Older copies kept as plugin settings
 are read once and removed from `shell.json` after that file is written.
 Album and playlist covers are downloaded by a small HTTP/1.1 helper into
 `$XDG_STATE_HOME/aria/artwork` (capped at 320 files). Qt's own image loader uses
