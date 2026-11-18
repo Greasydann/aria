@@ -1129,7 +1129,8 @@ BarWidget {
               fallbackText: Api.idleMediaText(
                 root.spotify ? root.spotify.artist : "",
                 root.spotify ? root.spotify.lastPlayedItem : null, "subtitle", "")
-              fallbackClickable: fallbackText !== "" && artists.length === 0
+              fallbackClickable: miniArtistLinks.fallbackText !== ""
+                && miniArtistLinks.artists.length === 0
                 && root.spotify && root.spotify.currentArtistContextAvailable
               color: root.spotify && root.spotify.artist !== ""
                 && root.spotify.currentArtistContextAvailable

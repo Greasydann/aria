@@ -1949,6 +1949,29 @@ TestCase {
     compare(Api.resumePlaybackAvailable(false, { item: { uri: "" } }), false)
   }
 
+  function test_payloadDetailItem_fillsWhatThePageBinds() {
+    // The mini player sends only type/id/name; the detail page binds uri,
+    // subtitle, artists and imageUrl before the metadata request lands.
+    var item = Api.payloadDetailItem({ type: "artist", id: "abc",
+      name: "Frank Ocean" })
+    compare(item.kind, "context")
+    compare(item.uri, "spotify:artist:abc")
+    compare(item.subtitle, "Artist")
+    compare(item.imageUrl, "")
+    compare(item.artists.length, 0)
+    // A fully normalized item keeps its fields.
+    var full = Api.payloadDetailItem({ kind: "context", type: "album", id: "x",
+      uri: "spotify:album:x", name: "Blonde", subtitle: "Frank Ocean · Album",
+      imageUrl: "https://image", artists: [{ id: "a", name: "Frank Ocean" }] })
+    compare(full.uri, "spotify:album:x")
+    compare(full.subtitle, "Frank Ocean · Album")
+    compare(full.imageUrl, "https://image")
+    compare(full.artists.length, 1)
+    // Unknown types are not navigable.
+    compare(Api.payloadDetailItem({ type: "track", id: "t" }), null)
+    compare(Api.payloadDetailItem(null), null)
+  }
+
   function test_idleMediaText_prefersLiveThenLastPlayedThenLabel() {
     var item = { name: "Blue in Green", subtitle: "Miles Davis", imageUrl: "" }
     compare(Api.idleMediaText("Live", item, "name", "Nothing playing"), "Live")

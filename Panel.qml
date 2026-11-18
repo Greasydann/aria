@@ -1853,7 +1853,7 @@ Item {
       shell.bar.hideBarWidget(pluginId)
     var requestedTab = String(payload.tab || "")
     var requestedDetail = requestedTab === "detail" && payload.detailItem
-      ? payload.detailItem : null
+      ? Api.payloadDetailItem(payload.detailItem) : null
     restoreUiState(!requestedDetail)
     if (requestedDetail) {
       currentTab = "detail"
@@ -4233,7 +4233,7 @@ Item {
                       "subtitle", "Choose something to play")
                     fallbackClickable: root.service && root.service.artist !== ""
                       && root.service.currentArtistContextAvailable
-                      && artists.length === 0
+                      && currentArtistLinks.artists.length === 0
                     color: root.service && root.service.artist
                       && root.service.currentArtistContextAvailable ? root.accent
                       : root.muted

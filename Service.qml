@@ -33,8 +33,10 @@ Item {
     if (explicit) return explicit
     return homeDirectory ? homeDirectory + "/.local/state" : ".local/state"
   }
-  readonly property string stateDir: stateHome + "/omarchy-spotify"
+  readonly property string stateDir: stateHome + "/aria"
   readonly property string sessionPath: stateDir + "/session.json"
+  readonly property string legacySessionPath: stateHome + "/omarchy-spotify/session.json"
+  property bool sessionMigrated: false
 
   readonly property var defaultSettingValues: ({
     deviceName: "Aria",
@@ -492,6 +494,7 @@ Item {
   property bool detailLoading: false
   property string detailMessage: ""
   property int detailSerial: 0
+  property string detailArtistRetryKey: ""
   property int detailRestoreTargetCount: 0
   property var artistAlbums: []
   property string artistAlbumsNext: ""
@@ -1462,6 +1465,9 @@ Item {
 
   function refreshView(view) {
     loadPlaybackState()
+    // Refresh is an explicit retry: let a previously failed artist lookup run
+    // again instead of staying on the cached failure.
+    detailArtistRetryKey = ""
     openView(view, true)
   }
 
@@ -2347,6 +2353,23 @@ Item {
       if (error) {
         root.detailRestoreTargetCount = 0
         root.detailLoading = false
+        // A stale or unavailable artist id would leave this page blank and,
+        // because the item is persisted for the next open, keep restoring a
+        // dead page. Look the artist up by name once instead.
+        var retryKey = String(item.id || "") + "|" + String(item.name || "")
+        if (type === "artist" && item.name
+            && retryKey !== root.detailArtistRetryKey) {
+          root.detailArtistRetryKey = retryKey
+          root.resolveArtist(item.name, function(resolved) {
+            if (serial !== root.detailSerial) return
+            if (!resolved || String(resolved.id || "") === String(item.id || "")) {
+              root.fail(error)
+              return
+            }
+            root.openDetail(resolved, initialArtistQuery, restoredItemCount)
+          })
+          return
+        }
         root.fail(error)
         return
       }
@@ -4181,6 +4204,23 @@ Item {
     id: ensureStateDir
     running: false
     command: ["/usr/bin/mkdir", "-p", root.stateDir]
+    onExited: {
+      if (!root) return
+      if (!root.sessionMigrated) {
+        root.sessionMigrated = true
+        legacySessionCopy.running = true
+        return
+      }
+      if (!root.sessionFileReady) sessionFile.reload()
+      else if (root.sessionFileDirty) root.flushSessionFile()
+    }
+  }
+
+  // One-time move of the pre-rename session file. cp -n keeps a newer file.
+  Process {
+    id: legacySessionCopy
+    running: false
+    command: ["/usr/bin/cp", "-n", root.legacySessionPath, root.sessionPath]
     onExited: {
       if (!root) return
       if (!root.sessionFileReady) sessionFile.reload()

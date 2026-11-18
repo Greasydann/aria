@@ -99,6 +99,29 @@ function shallowCopy(value) {
   return copy
 }
 
+// A detail page can be requested by another surface (the mini player, a
+// notification, a hotkey) that only knows the type, id and name. Fill in the
+// fields the page binds before its first paint; the metadata request then
+// replaces the item with a fully normalized one.
+function payloadDetailItem(value) {
+  if (!value || typeof value !== "object") return null
+  var type = String(value.type || "")
+  if (["artist", "album", "playlist", "show", "audiobook"].indexOf(type) < 0)
+    return null
+  var item = shallowCopy(value)
+  var id = String(value.id || "")
+  item.kind = "context"
+  item.type = type
+  item.id = id
+  item.uri = String(value.uri || (id ? "spotify:" + type + ":" + id : ""))
+  item.name = String(value.name || "Untitled")
+  item.subtitle = String(value.subtitle || (type === "artist" ? "Artist" : ""))
+  item.description = String(value.description || "")
+  item.imageUrl = String(value.imageUrl || "")
+  item.artists = Array.isArray(value.artists) ? value.artists : []
+  return item
+}
+
 function assign(target, source) {
   var next = target && typeof target === "object" && !Array.isArray(target)
     ? target : ({})
