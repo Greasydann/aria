@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Ui
+import qs.Commons as Theme
 
 import "Api.js" as Api
 
@@ -8,6 +9,21 @@ import "Api.js" as Api
 // moved() established until the backing player acknowledges the command.
 PanelSlider {
   id: root
+
+  // PanelSlider's default track color is a translucent state fill. Over the
+  // row's CursorSurface hover highlight it composites to nearly nothing, so
+  // the unfilled part of the bar reads as a ghost segment next to the thumb.
+  // Blend the same fill over the bar background into an opaque color so the
+  // track renders identically whether or not the row is highlighted.
+  trackColor: {
+    if (!bar) return "#333"
+    var fill = Theme.Style.selectedFillFor(bar.foreground, Theme.Color.accent)
+    var base = bar.background
+    var a = fill.a
+    return Qt.rgba(base.r * (1 - a) + fill.r * a,
+      base.g * (1 - a) + fill.g * a,
+      base.b * (1 - a) + fill.b * a, 1)
+  }
 
   property real sourceValue: 0
   property bool sourcePending: false

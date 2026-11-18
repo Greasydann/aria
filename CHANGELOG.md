@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.10 (2026-11-18)
+
+- Fix the ghosted volume bar on hover: the slider's unfilled track was a
+  translucent fill that washed out over the row's hover highlight, leaving a
+  faded fragment next to the thumb. The track now composites over the panel
+  background so it renders the same whether or not the row is highlighted.
+
+
 ## 1.2.9 (2026-11-18)
 
 - Keep the volume slider steady during Soloist playback: the displayed level now
