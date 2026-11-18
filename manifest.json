@@ -30,7 +30,6 @@
     "defaultSection": "left",
     "defaults": {
       "deviceName": "Aria",
-      "idleShutdownMinutes": 15,
       "showMiniPlayer": "On",
       "showVinylRecord": "Off",
       "shortcutPlayer": "Omarchy Music app",
@@ -43,7 +42,6 @@
       "scrollSpeed": "1",
       "maxBarTextWidth": "240",
       "fixedBarWidth": "Off",
-      "audioQuality": "320 kbps",
       "showArtwork": "On"
     },
     "schema": [
@@ -54,16 +52,7 @@
         "defaultValue": "Aria",
         "description": "Shown in Devices immediately. Spotify Connect uses the new name the next time local playback starts."
       },
-      {
-        "key": "idleShutdownMinutes",
-        "type": "integer",
-        "label": "Sleep empty local receiver",
-        "min": 0,
-        "max": 1440,
-        "step": 5,
-        "defaultValue": 15,
-        "description": "Minutes after the player closes when no media is loaded. Paused media stays available to resume. Use 0 to keep this computer available even while the player is closed."
-      },
+      
       {
         "key": "showMiniPlayer",
         "type": "enum",
@@ -188,18 +177,7 @@
         "defaultValue": "Off",
         "description": "When on, the bar label always reserves the maximum width while a track is shown, so neighbouring widgets do not shift between songs. Unavailable while the width is unlimited."
       },
-      {
-        "key": "audioQuality",
-        "type": "enum",
-        "label": "Local playback quality",
-        "options": [
-          "96 kbps",
-          "160 kbps",
-          "320 kbps"
-        ],
-        "defaultValue": "320 kbps",
-        "description": "Takes effect the next time playback starts."
-      },
+      
       {
         "key": "showArtwork",
         "type": "enum",

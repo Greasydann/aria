@@ -62,7 +62,6 @@ Item {
 
   property string draftClientId: ""
   property string draftDeviceName: "Spoty"
-  property string draftIdleMinutes: "15"
   property bool draftShowMiniPlayer: true
   property bool draftShowArtwork: true
   property bool draftShowVinylRecord: false
@@ -86,7 +85,6 @@ Item {
   property real draftMaxBarTextWidth: 240
   // Disclosure state for the width slider; deliberately not persisted.
   property bool barTextWidthExpanded: false
-  property string draftAudioQuality: "320 kbps"
   property var contextItem: null
   property var contextSourceItems: []
   property string contextSourceUri: ""
@@ -199,7 +197,6 @@ Item {
     if (!service) return
     draftClientId = String(service.settings.clientId || "")
     draftDeviceName = service.deviceName
-    draftIdleMinutes = String(service.idleShutdownMinutes)
     draftShowMiniPlayer = service.showMiniPlayer
     draftShowArtwork = service.artworkEnabled
     draftShowVinylRecord = service.showVinylRecord
@@ -213,15 +210,12 @@ Item {
     draftScrollSpeed = service.scrollSpeed
     draftMaxBarTextWidth = service.maxBarTextWidth
     draftFixedBarWidth = service.fixedBarWidth
-    draftAudioQuality = service.audioQuality
   }
 
   function saveSettings(showStatus) {
     if (!service) return
     var values = {
       deviceName: String(draftDeviceName || "").trim() || "Spoty",
-      idleShutdownMinutes: Math.max(0, Math.min(1440,
-        Math.floor(Number(draftIdleMinutes) || 0))),
       showMiniPlayer: draftShowMiniPlayer ? "On" : "Off",
       showArtwork: draftShowArtwork ? "On" : "Off",
       showVinylRecord: draftShowVinylRecord ? "On" : "Off",
@@ -235,7 +229,6 @@ Item {
       scrollSpeed: Api.normalizedScrollSpeed(draftScrollSpeed),
       maxBarTextWidth: Api.normalizedMaxBarTextWidth(draftMaxBarTextWidth),
       fixedBarWidth: draftFixedBarWidth ? "On" : "Off",
-      audioQuality: draftAudioQuality,
       clientId: String(draftClientId || "").trim().toLowerCase()
     }
     service.persistSettings(values)
@@ -247,24 +240,12 @@ Item {
     saveSettings(false)
   }
 
-  function cycleAudioQuality() {
-    draftAudioQuality = draftAudioQuality === "96 kbps" ? "160 kbps"
-      : (draftAudioQuality === "160 kbps" ? "320 kbps" : "96 kbps")
-    persistDraftSettings()
-  }
-
   function cycleShortcutPlayer() {
     draftShortcutPlayer = draftShortcutPlayer === "Omarchy Music app"
       ? "Full player"
       : (draftShortcutPlayer === "Full player"
         ? "Mini player" : "Omarchy Music app")
     persistDraftSettings()
-  }
-
-  function audioQualityLabel() {
-    if (draftAudioQuality === "96 kbps") return "Standard · 96 kbps"
-    if (draftAudioQuality === "320 kbps") return "Very high · 320 kbps"
-    return "High · 160 kbps"
   }
 
   function scrollSpeedLabel() {
@@ -6517,31 +6498,6 @@ Item {
                   onEditingFinished: root.persistDraftSettings()
                 }
               }
-              Column {
-                width: Math.max(Style.space(150), parent.width - Math.round(parent.width * 0.58)
-                  - parent.spacing)
-                spacing: Style.space(4)
-
-                Text {
-                  text: "STOP WHEN IDLE · MINUTES"
-                  color: root.muted
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
-                  font.bold: true
-                }
-                TextField {
-                  width: parent.width
-                  foreground: root.foreground
-                  placeholderText: "15"
-                  text: root.draftIdleMinutes
-                  validator: IntValidator { bottom: 0; top: 1440 }
-                  onTextEdited: {
-                    root.draftIdleMinutes = text
-                    root.persistDraftSettings()
-                  }
-                  onEditingFinished: root.persistDraftSettings()
-                }
-              }
             }
 
             Column {
@@ -6956,39 +6912,9 @@ Item {
               }
             }
 
-            Column {
-              width: parent.width
-              spacing: Style.space(6)
-
-              Text {
-                text: "PLAYBACK"
-                color: root.muted
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-              }
-
-              Button {
-                text: "Audio quality · " + root.audioQualityLabel()
-                iconText: "󰎈"
-                foreground: root.foreground
-                tooltipText: "Change streaming quality"
-                onClicked: root.cycleAudioQuality()
-              }
-            }
-
             Text {
               width: parent.width
-              text: "This computer stays visible in Spotify Connect while the player is open. After it closes, an empty receiver sleeps at the idle timeout; paused media stays available to resume. Use 0 minutes to keep this computer available even while the player is closed. Device name and audio quality changes apply the next time local playback starts."
-              color: root.muted
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
-              wrapMode: Text.WordWrap
-            }
-
-            Text {
-              width: parent.width
-              text: "Changes apply immediately. Device name and audio quality update the next time local playback starts."
+              text: "Playback runs through the Soloist receiver; changes apply immediately."
               color: root.muted
               font.family: root.fontFamily
               font.pixelSize: Style.font.bodySmall
