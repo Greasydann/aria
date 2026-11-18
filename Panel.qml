@@ -15,6 +15,10 @@ Item {
   property var service: null
   property bool opened: false
   property bool closingFromHost: false
+  // Set only for explicit closes (bar icon, Escape, the close button, the
+  // close action). A shell restart destroys the panel without this flag, which
+  // is what lets the service reopen it afterwards.
+  property bool playerClosedByUser: false
   property bool escapeCloseArmed: false
   property real volumeBeforeMute: 0.5
   property double lastVolumeAdjustAt: 0
@@ -512,7 +516,9 @@ Item {
       selectedPlaylist: selected,
       selectedPlaylistId: selected ? selected.id : restoredPlaylistId,
       selectedPlaylistItemCount: selectedItemCount,
-      lastRadioPlaylist: service.lastRadioPlaylist
+      lastRadioPlaylist: service.lastRadioPlaylist,
+      playerOpen: opened && !playerClosedByUser,
+      playerSeenAt: Date.now()
     })
   }
 
@@ -1243,7 +1249,7 @@ Item {
     }
     else if (action === "retry-search" && service) service.retrySearch(searchType)
     else if (action === "refresh") refreshButton.clicked()
-    else if (action === "close") requestClose()
+    else if (action === "close") closeByUser()
     else if (action === "like" && service) service.toggleCurrentTrackSaved()
     else if (action === "context") openNowPlayingContext()
     else if (action === "artist") openCurrentArtist()
@@ -1916,7 +1922,9 @@ Item {
       openedForLogin = true
     }
     closingFromHost = false
+    playerClosedByUser = false
     opened = true
+    persistUiState()
     lyricsViewOpen = payload.lyrics === true && service
       && service.lyricsAvailable
     if (payload.shortcutLatch) {
@@ -1944,10 +1952,11 @@ Item {
   }
 
   function close() {
+    playerClosedByUser = true
+    opened = false
     persistUiState()
     clearShortcutMode()
     closingFromHost = true
-    opened = false
     if (service) {
       service.setUiVisible("full-panel", false)
       service.cancelSearch(false)
@@ -1962,6 +1971,15 @@ Item {
     disarmEscapeClose()
     if (shell && typeof shell.hide === "function") shell.hide(pluginId)
     else close()
+  }
+
+  // Explicit user close (Escape, the close button, the close action, the bar
+  // icon). Recorded right away so a shell restart cannot undo it.
+  function closeByUser(ignored) {
+    playerClosedByUser = true
+    opened = false
+    persistUiState()
+    requestClose()
   }
 
   function rememberCurrentContentTab() {
@@ -2309,9 +2327,17 @@ Item {
     })
   }
 
+  Timer {
+    interval: 20000
+    running: root.opened
+    repeat: true
+    onTriggered: root.persistUiState()
+  }
+
   Component.onDestruction: {
     if (service) {
       persistUiState()
+      if (!playerClosedByUser && opened) service.schedulePlayerClosed()
       service.setUiVisible("full-panel", false)
       service.cancelSearch(false)
       service.clearSearch()
@@ -3166,7 +3192,7 @@ Item {
         if (root.currentTab === "detail" || root.navigationStack.length) {
           root.disarmEscapeClose()
           root.goBack()
-        } else if (root.escapeCloseArmed) root.requestClose()
+        } else if (root.escapeCloseArmed) root.closeByUser()
         else root.armEscapeClose()
         event.accepted = true
       }
@@ -3953,7 +3979,7 @@ Item {
                   : root.shortcutHint("Close", "Esc, Esc")
                 focusable: false
                 hasCursor: root.cursorOn("header", "close")
-                onClicked: root.requestClose()
+                onClicked: root.closeByUser()
                 onHovered: function(on) { root.hoverPanelCursor("header", "close", on) }
                 KeyHint { region: "header"; action: "close"; sequences: ["Esc"] }
               }

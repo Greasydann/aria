@@ -119,7 +119,9 @@ and similar) are written to `$XDG_STATE_HOME/aria/session.json` so they do not
 pollute Omarchy's `shell.json`. The last page is not part of that state: the
 player opens on the landing page chosen in Settings (For you, Liked Songs,
 Search, Playlists, or one playlist; Liked Songs by default), and only an
-explicit payload (an artist or album link) selects a different page. Older copies kept as plugin settings
+explicit payload (an artist or album link) selects a different page. The
+record also notes whether the full player was open, with a short heartbeat, so
+a shell restart can reopen it while a later login stays closed. Older copies kept as plugin settings
 are read once and removed from `shell.json` after that file is written.
 Short-lived access tokens and PKCE values remain in the shell process. OAuth
 state is checked, callback listeners bind explicitly to IPv4 loopback, API URLs

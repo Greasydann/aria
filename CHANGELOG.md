@@ -7,6 +7,9 @@
   their own page.
 - Fix a settings race where the shell's pre-write config snapshot could undo a
   just-saved preference on its way back through the bar widget.
+- Reopen the full player after the Omarchy shell restarts while it was open.
+  Explicit closes (bar icon, Escape, the close button) stay closed, and a
+  login hours later does not reopen a panel left open in the previous session.
 
 ## 1.0.0 (2026-11-17) — Aria
 

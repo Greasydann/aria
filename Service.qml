@@ -750,6 +750,43 @@ Item {
     }
     sessionFileReady = true
     reconcileSessionPersistence()
+    schedulePanelRestore()
+  }
+
+  // Reopen the full player after the shell restarts while it was open.
+  // "Open" is remembered by the panel (playerOpen/playerSeenAt); the freshness
+  // window keeps a login or boot from reopening a panel left open last time.
+  readonly property int panelRestoreWindowMs: 120000
+  property bool panelRestoreScheduled: false
+
+  function schedulePanelRestore() {
+    if (panelRestoreScheduled) return
+    panelRestoreScheduled = true
+    panelRestoreTimer.restart()
+  }
+
+  function restoreOpenPanel() {
+    var state = sessionState || ({})
+    if (state.playerOpen !== true) return
+    var seenAt = Number(state.playerSeenAt || 0)
+    if (!(seenAt > 0) || Date.now() - seenAt > panelRestoreWindowMs) return
+    if (shell && typeof shell.summon === "function") shell.summon(pluginId, "{}")
+  }
+
+  // A hidden panel that was not closed explicitly stays "open" until this
+  // timer confirms the shell is still running. A shell that is quitting
+  // destroys the timer with it, so a restart keeps the flag and reopens.
+  function schedulePlayerClosed() {
+    playerCloseTimer.restart()
+  }
+
+  function markPlayerClosed() {
+    // A hide-and-summons (moving the player to another workspace) recreates
+    // the panel before this runs; it is still open, so leave the flag alone.
+    if (shell && typeof shell.isPluginOpen === "function"
+        && shell.isPluginOpen(pluginId)) return
+    var next = Api.assign(Api.shallowCopy(sessionState), { playerOpen: false })
+    persistSession(next)
   }
 
   function scheduleSessionSave() {
@@ -4214,6 +4251,20 @@ Item {
     id: settingsSync
     interval: 0
     onTriggered: root.syncSettings()
+  }
+
+  Timer {
+    id: panelRestoreTimer
+    interval: 4000
+    repeat: false
+    onTriggered: root.restoreOpenPanel()
+  }
+
+  Timer {
+    id: playerCloseTimer
+    interval: 1500
+    repeat: false
+    onTriggered: root.markPlayerClosed()
   }
 
   FileView {
