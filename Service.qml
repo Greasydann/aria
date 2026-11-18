@@ -3792,8 +3792,15 @@ Item {
     var value = Math.max(0, Math.min(lengthSeconds || Number.MAX_VALUE,
       Number(seconds) || 0))
     noteActivity()
-    var remoteSerial = useRemotePlayback ? beginRemoteSeek(value) : 0
+    var soloist = soloistTarget()
+    // Hold the slider where the user dropped it until the Soloist position
+    // poll reports the requested spot, then the usual poll logic releases it.
+    var remoteSerial = useRemotePlayback || soloist ? beginRemoteSeek(value) : 0
     if (sendSonosControl("seek", String(Math.round(value)))) return
+    if (soloist) {
+      soloistCtl(["seek", String(Math.round(value * 1000))])
+      return
+    }
     if (!useRemotePlayback && hasLocalPlayer
         && activePlayer.canSeek && activePlayer.positionSupported)
       activePlayer.position = value
