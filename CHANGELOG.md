@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.5 (2026-11-18)
+
+- Resolve the Soloist executable from the current user's home (or an explicit
+  `soloistBin` setting) instead of a hardcoded path, so Aria works on any
+  account and never touches another user's installation.
+
 ## 1.2.4 (2026-11-18)
 
 - Ship attested backend releases from this repository (x86_64 and aarch64) so

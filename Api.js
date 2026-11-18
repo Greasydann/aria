@@ -454,6 +454,16 @@ function cachedArt(cache, value) {
     ? cache.imageUrl(url) : url
 }
 
+// Resolve the Soloist executable. Lives in the user's home bin per the
+// README; an explicit soloistBin setting wins. Never hardcode an absolute
+// home path — the plugin runs on any account.
+function resolveSoloistBin(home, override) {
+  var bin = String(override || "").trim()
+  if (bin) return bin
+  var dir = String(home || "").trim().replace(/\/+$/, "")
+  return dir ? dir + "/.local/bin/soloist" : "soloist"
+}
+
 function normalizedShortcutHints(value) {
   return String(value || "On") === "Off" ? "Off" : "On"
 }

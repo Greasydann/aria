@@ -1949,6 +1949,13 @@ TestCase {
     compare(Api.resumePlaybackAvailable(false, { item: { uri: "" } }), false)
   }
 
+  function test_resolveSoloistBin_prefersSettingThenHome() {
+    compare(Api.resolveSoloistBin("/home/ella", ""), "/home/ella/.local/bin/soloist")
+    compare(Api.resolveSoloistBin("/home/ella", "/opt/soloist"), "/opt/soloist")
+    compare(Api.resolveSoloistBin("/home/ella/", ""), "/home/ella/.local/bin/soloist")
+    compare(Api.resolveSoloistBin("", ""), "soloist")
+  }
+
   function test_normalizedLandingPage_keepsKnownPages() {
     compare(Api.normalizedLandingPage("home"), "home")
     compare(Api.normalizedLandingPage("liked"), "liked")

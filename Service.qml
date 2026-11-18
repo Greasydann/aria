@@ -53,6 +53,7 @@ Item {
     scrollSpeed: "1",
     maxBarTextWidth: "240",
     fixedBarWidth: "Off",
+    soloistBin: "",
     landingPage: "liked",
     landingPlaylistId: "",
     landingPlaylistName: "",
@@ -66,6 +67,7 @@ Item {
   readonly property string landingPlaylistId: String(settings.landingPlaylistId || "").trim()
   readonly property string landingPlaylistName: String(settings.landingPlaylistName || "").trim()
   readonly property string soloistDeviceName: "Aria"
+  readonly property string soloistBin: Api.resolveSoloistBin(homeDirectory, settings.soloistBin)
   readonly property var soloistDeviceNames: ["Aria", "Spoty", "Spotty", "SoloistPC", "OmaSpotify (this PC)"]
 
   readonly property string hostName: String(hostnameReader.text() || "").trim()
@@ -626,7 +628,7 @@ Item {
       "showVinylRecord", "shortcutPlayer", "shortcutHints", "showLyrics", "showArtwork", "showTrackTitle", "showArtistName",
       "showPausedTrack", "scrollBarText", "scrollSpeed", "maxBarTextWidth",
       "fixedBarWidth", "landingPage", "landingPlaylistId",
-      "landingPlaylistName", "clientId"]
+      "landingPlaylistName", "soloistBin", "clientId"]
     for (var i = 0; i < keys.length; i++) {
       var key = keys[i]
       if (source[key] !== undefined) next[key] = source[key]
@@ -650,6 +652,7 @@ Item {
     if (Number(next.maxBarTextWidth) === 0) next.scrollBarText = "Off"
     next.fixedBarWidth = String(next.fixedBarWidth || "Off") === "On" ? "On" : "Off"
     if (Number(next.maxBarTextWidth) === 0) next.fixedBarWidth = "Off"
+    next.soloistBin = String(next.soloistBin || "").trim()
     next.landingPage = Api.normalizedLandingPage(next.landingPage)
     next.landingPlaylistId = String(next.landingPlaylistId || "").trim()
     next.landingPlaylistName = String(next.landingPlaylistName || "").trim()
@@ -3194,7 +3197,7 @@ Item {
     function toggleFullPlayer(): string { return root.invokePlayerShortcut("toggleFullPlayerShortcut") }
     function playPause(): string {
       if (root.soloistDevice() || root.officialSpotifyMprisPlayer() === null) {
-        var bin = "/home/dann/.local/bin/soloist"
+        var bin = root.soloistBin
         Quickshell.execDetached(["sh", "-c",
           bin + " ctl now 2>&1 | grep -q '\\bplaying\\b' && " + bin + " ctl pause || " + bin + " ctl play"])
       }
@@ -3202,12 +3205,12 @@ Item {
       return "ok"
     }
     function next(): string {
-      Quickshell.execDetached(["/home/dann/.local/bin/soloist", "ctl", "next"])
+      Quickshell.execDetached([root.soloistBin, "ctl", "next"])
       root.next()
       return "ok"
     }
     function previous(): string {
-      Quickshell.execDetached(["/home/dann/.local/bin/soloist", "ctl", "prev"])
+      Quickshell.execDetached([root.soloistBin, "ctl", "prev"])
       root.previous()
       return "ok"
     }
@@ -3731,7 +3734,7 @@ Item {
     var nextState = playing ? "pause" : "play"
     showMediaOsd(nextState)
     if (soloistTarget()) {
-      var bin = "/home/dann/.local/bin/soloist"
+      var bin = root.soloistBin
       Quickshell.execDetached(["sh", "-c",
         bin + " ctl now 2>&1 | grep -q '\\bplaying\\b' && " + bin + " ctl pause || " + bin + " ctl play"])
       return
@@ -3745,7 +3748,7 @@ Item {
   }
 
   function soloistCtl(args) {
-    var cmd = ["/home/dann/.local/bin/soloist", "ctl"].concat(args || [])
+    var cmd = [root.soloistBin, "ctl"].concat(args || [])
     Quickshell.execDetached(cmd)
   }
 
@@ -4523,7 +4526,7 @@ Item {
 
   Process {
     id: soloistNowProcess
-    command: ["/home/dann/.local/bin/soloist", "ctl", "now", "--json"]
+    command: [root.soloistBin, "ctl", "now", "--json"]
     stdout: StdioCollector { id: soloistNowStdout; waitForEnd: true }
     stderr: StdioCollector { waitForEnd: true }
     onExited: function(exitCode) {
