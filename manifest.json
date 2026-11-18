@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "aria",
   "name": "Aria",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "author": "stappmus",
   "license": "MIT",
   "description": "Aria: a Spotify player for Omarchy in the spirit of quickshell.spotify, with local playback via Soloist.",
@@ -107,7 +107,7 @@
           "Off"
         ],
         "defaultValue": "On",
-        "description": "Show the Omasing lyrics button in the player and mini-player. When off, Ctrl+Shift+L is inactive too."
+        "description": "Show the lyrics button in the player and mini-player. When off, Ctrl+Shift+L is inactive too."
       },
       {
         "key": "showTrackTitle",

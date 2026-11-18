@@ -7,52 +7,37 @@ details out of the user-facing README.
 
 Aria runs as a plugin inside Omarchy's existing `omarchy-shell`
 Quickshell process. It provides a shared service, a bar widget, and a lazy-loaded
-panel. There is no embedded website, browser engine, second shell process, or
-resident helper process.
+panel. There is no embedded website, browser engine, or second shell process.
 
-Local playback state and ordinary controls use MPRIS. Starting playback on this
-computer uses the backend's private Unix socket (`load`, `add_to_queue`) when
-that process is running. Active playback on another Spotify Connect device
-comes from the Spotify Web API, refreshed while a UI is visible and at a slower
-rate while that device is playing. Fast `/me/player` polling is reserved for
-remote or unknown targets. Spotify data and other user actions also use the
-Web API.
+Soloist is the only playback target. The app never launches the official
+Spotify desktop app and never starts an audio engine of its own: it resolves
+the user's Soloist receiver — a genuine Spotify Connect device — and routes
+transport commands to it. Ordinary controls, media keys, and the `aria.player`
+IPC target go through `soloist ctl`. Active playback on other Spotify Connect
+devices comes from the Spotify Web API, refreshed while a UI is visible and at
+a slower rate while that device is playing; fast `/me/player` polling is
+reserved for remote or unknown targets. Spotify data and other user actions
+also use the Web API.
 
-Local audio runs in the plugin-owned `omarchy-spotify-backend` (Aria's backend) Rust process,
-supervised by a static systemd user unit that is never enabled at login. The
-backend embeds a commit-pinned librespot revision rather than duplicating its
-private-protocol implementation. It owns configuration, cache/authentication,
-MPRIS, lifecycle, and a stable private Unix-socket boundary. The app starts the
-unit whenever its full player or mini-player is open, when you play on this
-computer, or when you choose it in Devices. Once every player surface closes,
-it stops after the configured idle period; 0 keeps it available indefinitely.
-The distro `spotifyd` unit is retained as a non-running fallback; the two units
-conflict so they cannot claim the same Connect identity together.
+Soloist's Connect registration can blink out of `/me/player/devices` while it
+keeps playing, so device resolution also accepts Soloist's fallback report and
+cross-checks playback state with `soloist ctl now --json`. A UI-only synthetic
+receiver (`soloist:aria`) stands in until the real Connect id is visible, so
+the device list and the Now playing card stay stable across refreshes.
 
-The unit sets `PULSE_LATENCY_MSEC=30` only for local playback and caps
-librespot's private player runtime at two Tokio workers. The backend's own
-control runtime is single-threaded; keeping two player workers still allows
-network fetching, preloading, and blocking decoder work to overlap. Quickshell
-interpolates MPRIS position locally, so the backend publishes one authoritative
-position update per second instead of four.
-
-MPRIS uses a PID-qualified instance bus name, as required by the server library.
-Quickshell discovers the backend by its `librespot` identity and desktop entry.
-This lets diagnostic instances coexist without replacing the supervised
-player's bus ownership or making the app lose local playback state.
-
-The pinned librespot revision also applies an endpoint-continuous 20 ms fade
-out/in around manual track replacement. Natural end-of-track gapless
-transitions, seeks, and passthrough are unchanged. This fixes both the queued
-tail and the smaller waveform discontinuity without changing PipeWire routing
-or speaker tuning.
+Login and browsing run through the plugin-owned `omarchy-spotify-backend`
+(Aria's backend) Rust process, executed with its `session` subcommand: device
+authorization plus native collection, playlist, search, catalogue, and Connect
+requests over private stdin/stdout. Only that subcommand runs — the backend's
+embedded librespot audio engine and MPRIS interface are never started, and no
+systemd unit is enabled at login.
 
 Volume sliders apply while the knob moves; the seek slider still commits on
 release so a drag cannot make the player re-buffer per frame. A drag emits a
 command per input event, so `Service` coalesces them: the first value is sent
 immediately and later ones are queued and flushed at a per-backend interval,
-`Api.volumeFlushInterval` — 80 ms for a local MPRIS property write, 250 ms for
-the rate-limited Web API, and 120 ms for Sonos. The queued value is only cleared
+`Api.volumeFlushInterval` — 80 ms for a local command, 250 ms for the
+rate-limited Web API, and 120 ms for Sonos. The queued value is only cleared
 once a backend accepts the command, so the position the knob was released at is
 always the one that lands. The optimistic slider value is held until the player
 reports it, and playback state is refetched once the drag settles rather than
@@ -62,8 +47,8 @@ after every command.
 
 - Omarchy 4 with the Quickshell shell enabled
 - Spotify Premium
-- the exact-commit attested plugin backend, a local source build, or `spotifyd`
-  0.4.2 or newer as fallback
+- a paired Soloist receiver (`~/.local/bin/soloist`) for playback on this
+  computer; see the README's Soloist section for setup
 - Omarchy base tools: `secret-tool`, `openssl`, `socat`, `xdg-open`, `wl-copy`,
   `avahi-browse`, `systemctl`, and Python 3
 
@@ -83,9 +68,8 @@ same-release checksum alone is never accepted as provenance.
 
 If `gh` is unavailable or any download, checksum, identity, or attestation
 check fails, the artifact is not executed. Setup instead builds `Cargo.lock`
-from the reviewed source with the available Cargo when present, or offers the
-official Arch `spotifyd` package as the last-resort fallback. Configuration,
-verified downloads, local builds, and user units themselves need no privilege.
+from the reviewed source with the available Cargo when present.
+Configuration, verified downloads, and local builds need no privilege.
 
 Omarchy treats any write inside a plugin directory as a change to the plugin and
 hot-reloads it, so the backend is compiled to
@@ -98,10 +82,15 @@ from reloading the plugin — and killing the build — mid-setup. A stale
 
 `NativeSession.qml` supervises the repository's backend `session` command over
 private stdin/stdout. The backend owns device authorization, native collection,
-playlist, search, catalogue and Connect requests. No TCP callback port, personal
-Developer app, Web API grant or external proxy is involved. Browser pairing is
-performed on Spotify's website, then a reusable librespot credential serves both
-browsing and playback. Native protocol extensions are implemented locally using
+playlist, search, catalogue and Connect requests. No personal Developer app or
+external proxy is involved. Browser pairing is performed on Spotify's website,
+then a reusable librespot credential serves both browsing and playback.
+
+An optional second, full-scope OAuth login (`AuthManager.qml`) uses the user's
+own Spotify app client ID for the reads the native streaming token cannot do —
+listening history and top rankings on the For you page. Its refresh token
+lives in the same on-disk store, the login is one-time and renews itself, and
+every other feature works without it. Native protocol extensions are implemented locally using
 the existing pinned librespot dependency. Adapted JSON mapping code retains its
 MIT attribution in `THIRD_PARTY_NOTICES.md`; spotatui is not a dependency.
 
@@ -209,7 +198,7 @@ From a checkout on Omarchy 4:
 
 The command validates the manifest, installs the user-level playback files,
 links the checkout at
-`~/.config/omarchy/plugins/quickshell.spotify`, and enables the bar widget. It
+`~/.config/omarchy/plugins/aria`, and enables the bar widget. It
 refuses to replace an existing plugin.
 
 To install only the playback integration:
@@ -218,8 +207,9 @@ To install only the playback integration:
 ./scripts/setup.sh
 ```
 
-Neither path enables or starts a playback unit at login. Pass
-`--install-spotifyd` only when a distro fallback is also wanted.
+Neither path enables or starts a unit at login. Pass
+`--install-spotifyd` only if you also want the distro daemon installed as a
+dormant fallback; playback always targets Soloist.
 
 ## Verification
 
@@ -228,17 +218,18 @@ Neither path enables or starts a playback unit at login. Pass
 ```
 
 The suite runs Omarchy manifest validation, Qt 6 QML lint, offline Qt tests with
-mocked authentication responses, shell-script tests, configuration checks, and a
-forbidden-heavyweight-dependency scan.
-
-```bash
+mocked authentication responses, shell-script and Python tests (including the
+artwork-cache helper), configuration checks, and a
+forbidden-heavyweight-dependency scan. It ends with a network-dependent check
+of the published backend release; on an offline machine only that final step
+fails, everything before it is offline.
 
 ## Complete removal
 
 Run the bundled uninstaller from outside the plugin directory:
 
 ```bash
-cd "$HOME" && "$HOME/.config/omarchy/plugins/quickshell.spotify/scripts/uninstall.sh"
+cd "$HOME" && "$HOME/.config/omarchy/plugins/aria/scripts/uninstall.sh"
 ```
 
 This removes the plugin and all plugin-owned services, binaries, config, state,
@@ -256,8 +247,7 @@ omarchy pkg drop spotifyd
 ## Upstream projects
 
 - [Omarchy](https://github.com/basecamp/omarchy)
-- [spotifyd](https://github.com/Spotifyd/spotifyd)
-- [librespot](https://github.com/librespot-org/librespot)
-- [spotify-player](https://github.com/aome510/spotify-player)
-- [ncspot](https://github.com/hrkfdn/ncspot)
+- Soloist, the headless local receiver (see the README's Soloist section)
+- [librespot](https://github.com/librespot-org/librespot), embedded by the session backend
 - [Spotify Web API](https://developer.spotify.com/documentation/web-api)
+- [lrclib.net](https://lrclib.net), the synced-lyrics provider

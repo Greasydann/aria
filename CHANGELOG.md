@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 (2026-11-18)
 
 - Choose the page the player opens on in Settings: For you, Liked Songs, Search,
   Playlists, or a specific playlist. Artist, album and playlist links still open
