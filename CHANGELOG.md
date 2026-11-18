@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.4 (2026-11-18)
+
+- Ship attested backend releases from this repository (x86_64 and aarch64) so
+  setup no longer depends on the upstream fork's releases or a source build.
+- Logging in before the backend is installed now explains what to run instead
+  of failing silently.
+- README documents the required one-time backend setup and the locked source
+  build prerequisites.
+
 ## 1.2.3 (2026-11-18)
 
 - Complete uninstall now also removes the plugin-owned token and session state

@@ -18,6 +18,10 @@ Item {
   property bool sessionBusy: false
   property bool loginBusy: false
   property string lastError: ""
+  // Last error a structured response delivered, so a backend that exits right
+  // after answering (missing binary, crashed session) can keep its specific
+  // message instead of being overwritten by the generic exit text.
+  property string lastDeliveredError: ""
   property string pairingCode: ""
   property string loginUrl: ""
   property bool restartLogin: false
@@ -60,6 +64,7 @@ Item {
     loginUrl = ""
     loggedIn = status === 200 && data && data.logged_in === true
     lastError = error || ""
+    lastDeliveredError = lastError
     finishWaiters(loggedIn ? "native-session" : "", lastError || "Log in to Spotify first")
     if (loggedIn) loginSucceeded()
     else if (lastError) sessionUnavailable(lastError)
@@ -93,6 +98,7 @@ Item {
     if (loginBusy) return
     if (!enabled) { lastError = "Playback support is still being installed"; sessionUnavailable(lastError); return }
     lastError = ""
+    lastDeliveredError = ""
     loggedIn = false
     loggedOut()
     resetPending("Signing in to Spotify")
@@ -119,6 +125,7 @@ Item {
   }
   function logout() {
     lastError = ""
+    lastDeliveredError = ""
     restartLogin = false
     loggedIn = false
     loginBusy = false
@@ -186,7 +193,9 @@ Item {
         root.loginBusy = false
         if (root.wanted) {
           root.wanted = false
-          root.lastError = "Spotify session stopped. Click Log in to reconnect."
+          root.lastError = root.lastDeliveredError !== ""
+            ? root.lastDeliveredError
+            : "Spotify session stopped. Click Log in to reconnect."
           root.sessionUnavailable(root.lastError)
         }
       }

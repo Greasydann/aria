@@ -19,6 +19,24 @@ omarchy plugin add https://github.com/Greasydann/aria.git --enable
 Requires Omarchy 4, a personal Spotify Premium account, and
 [Soloist](#soloist-local-playback) for playback on this computer.
 
+### Prepare the backend (required before the first login)
+
+The plugin ships without a compiled backend, so run its bundled setup once
+after installing. Spotify login and browsing use this private backend; until
+it is installed, logging in explains exactly that instead of failing silently:
+
+```bash
+~/.config/omarchy/plugins/aria/scripts/setup.sh
+```
+
+Setup downloads the release binary for your architecture (x86_64 or aarch64),
+checks its SHA-256 checksum and GitHub build attestation, and installs it
+under `~/.local/lib/omarchy-spotify/`. If no verified release can be
+downloaded, it falls back to a locked source build, which needs the Rust
+toolchain pinned in `rust-toolchain.toml` (`rustup` fetches it), `cargo`,
+and a network connection. Set `OMARCHY_SPOTIFY_BUILD_FROM_SOURCE=1` to skip
+the download and build from source directly.
+
 ## Why you will love it
 
 - **Lightweight by design.** Enjoy your music without keeping a browser-sized
