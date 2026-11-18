@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Effects
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 import qs.Commons
 import qs.Commons as Theme
@@ -291,6 +292,14 @@ BarWidget {
     if (shortcutModeLatched) next.shortcutLatch = true
     close()
     if (!bar || !bar.shell) return
+    // The full player already open on another workspace stays there: the
+    // user is taken to it instead of the window being dragged over.
+    if (typeof bar.shell.isPluginOpen === "function"
+        && bar.shell.isPluginOpen("aria")) {
+      panelWorkspaceLookup.running = true
+      bar.shell.summon("aria", JSON.stringify(next))
+      return
+    }
     var encoded = JSON.stringify(next)
     if (typeof bar.shell.hide === "function"
         && typeof bar.shell.summon === "function") {
@@ -305,6 +314,25 @@ BarWidget {
     } else if (payload && typeof bar.shell.summon === "function")
       bar.shell.summon("aria", encoded)
     else bar.shell.toggle("aria", encoded)
+  }
+
+  // Find the full player's window and switch the user to its workspace.
+  Process {
+    id: panelWorkspaceLookup
+    command: ["/usr/bin/hyprctl", "-j", "clients"]
+    stdout: StdioCollector { waitForEnd: true }
+    stderr: StdioCollector { waitForEnd: true }
+    onExited: {
+      var clients = Api.parseJson(stdout.text, [])
+      if (!Array.isArray(clients)) return
+      for (var i = 0; i < clients.length; i++) {
+        var client = clients[i]
+        if (!client || !client.workspace) continue
+        if (String(client.title || "").indexOf("Aria") !== 0) continue
+        Hyprland.dispatch("workspace id:" + client.workspace.id)
+        return
+      }
+    }
   }
 
   function openCurrentArtist() {
