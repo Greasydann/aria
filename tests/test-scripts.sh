@@ -521,10 +521,12 @@ env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
 mkdir -p "$runtime_config/omarchy-spotify"
 printf 'device_name = "Aria"\n' >"$runtime_config/omarchy-spotify/spotifyd.conf"
 # The migration generation stored the session credentials under the shared
-# name; setup adopts them by copy so both plugins keep working.
-mkdir -p "$runtime_state/omarchy-spotify"
-printf 'legacy-oauth' >"$runtime_state/omarchy-spotify/oauth"
-printf 'legacy-zeroconf' >"$runtime_state/omarchy-spotify/zeroconf"
+# name; setup adopts them by copy so both plugins keep working. Each store
+# is a directory of librespot cache files.
+mkdir -p "$runtime_state/omarchy-spotify/oauth" \
+  "$runtime_state/omarchy-spotify/zeroconf"
+printf 'legacy-oauth' >"$runtime_state/omarchy-spotify/oauth/credentials.json"
+printf 'legacy-zeroconf' >"$runtime_state/omarchy-spotify/zeroconf/credentials.json"
 env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
   "XDG_CONFIG_HOME=$runtime_config" "XDG_CACHE_HOME=$runtime_cache" \
   "XDG_STATE_HOME=$runtime_state" "XDG_RUNTIME_DIR=$runtime_session" \
@@ -544,14 +546,15 @@ grep -q 'Keeping existing configuration' "$test_root/setup-migration.log"
 [[ ! -e $runtime_config/omarchy-spotify ]]
 
 # The saved sign-in is adopted by copy: Aria's state folder gets its own
-# credential files and the original plugin's credentials stay in place.
-[[ $(<"$runtime_state/aria/oauth") == 'legacy-oauth' ]]
-[[ $(<"$runtime_state/aria/zeroconf") == 'legacy-zeroconf' ]]
+# credential stores and the original plugin's credentials stay in place.
+[[ $(<"$runtime_state/aria/oauth/credentials.json") == 'legacy-oauth' ]]
+[[ $(<"$runtime_state/aria/zeroconf/credentials.json") == 'legacy-zeroconf' ]]
 [[ $(stat -c %a "$runtime_state/aria") == 700 ]]
-[[ $(stat -c %a "$runtime_state/aria/oauth") == 600 ]]
-[[ $(stat -c %a "$runtime_state/aria/zeroconf") == 600 ]]
-[[ $(<"$runtime_state/omarchy-spotify/oauth") == 'legacy-oauth' ]]
-[[ -f $runtime_state/omarchy-spotify/zeroconf ]]
+[[ $(stat -c %a "$runtime_state/aria/oauth") == 700 ]]
+[[ $(stat -c %a "$runtime_state/aria/oauth/credentials.json") == 600 ]]
+[[ $(stat -c %a "$runtime_state/aria/zeroconf") == 700 ]]
+[[ $(<"$runtime_state/omarchy-spotify/oauth/credentials.json") == 'legacy-oauth' ]]
+[[ -f $runtime_state/omarchy-spotify/zeroconf/credentials.json ]]
 grep -q "Copied the saved sign-in into Aria's own state folder." \
   "$test_root/setup-migration.log"
 
@@ -566,7 +569,7 @@ env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
 grep -q 'Session backend ready' "$test_root/setup-migration-again.log"
 ! grep -q "Copied the saved sign-in" "$test_root/setup-migration-again.log"
 ! grep -q "Moved Aria's backend" "$test_root/setup-migration-again.log"
-[[ $(<"$runtime_state/aria/oauth") == 'legacy-oauth' ]]
+[[ $(<"$runtime_state/aria/oauth/credentials.json") == 'legacy-oauth' ]]
 
 # The original Omarchy Spotify builds from the same source lineage, so its
 # backend passes Aria's identity checks. Without Aria's installed-by marker

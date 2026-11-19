@@ -114,17 +114,20 @@ fi
 # The session backend stores its Spotify authorization in its own state
 # directory. Upgrades from the shared-layout generations find it under the
 # omarchy-spotify name, which the original Omarchy Spotify plugin may still
-# be using, so adopt it by copying and leave the original in place.
-if [[ -f $legacy_credentials_dir/oauth && ! -e $credentials_dir/oauth ]]; then
-  install -d -m 700 -- "$credentials_dir"
-  for credentials_file in oauth zeroconf; do
-    if [[ -f $legacy_credentials_dir/$credentials_file \
-        && ! -e $credentials_dir/$credentials_file ]]; then
-      install -m 600 -- "$legacy_credentials_dir/$credentials_file" \
-        "$credentials_dir/$credentials_file"
-      echo "Copied the saved sign-in into Aria's own state folder."
-    fi
-  done
+# be using, so adopt it by copying and leave the original in place. Each
+# credential store is a directory of librespot cache files.
+if [[ -f $legacy_credentials_dir/oauth/credentials.json \
+    && ! -e $credentials_dir/oauth/credentials.json ]]; then
+  install -d -m 700 -- "$credentials_dir" "$credentials_dir/oauth"
+  install -m 600 -- "$legacy_credentials_dir/oauth/credentials.json" \
+    "$credentials_dir/oauth/credentials.json"
+  echo "Copied the saved sign-in into Aria's own state folder."
+fi
+if [[ -f $legacy_credentials_dir/zeroconf/credentials.json \
+    && ! -e $credentials_dir/zeroconf/credentials.json ]]; then
+  install -d -m 700 -- "$credentials_dir/zeroconf"
+  install -m 600 -- "$legacy_credentials_dir/zeroconf/credentials.json" \
+    "$credentials_dir/zeroconf/credentials.json"
 fi
 
 backend_install_is_current() {
