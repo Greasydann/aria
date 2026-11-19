@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.15 (2026-11-19)
+
+- Purge shared `omarchy-spotify` files only on positive proof or consent: the
+  uninstaller asks on a terminal, accepts `--include-shared` up front, and
+  removes them silently only when Aria's install marker proves it created
+  them. Omarchy's plugin manager keeps a removed plugin's data and leaves no
+  record, so a missing checkout no longer counts as ownership.
+
 ## 1.2.14 (2026-11-19)
 
 - Setup no longer adopts a sign-in saved under the shared omarchy-spotify

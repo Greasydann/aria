@@ -2,15 +2,18 @@
 set -euo pipefail
 
 purge=0
+include_shared=0
 purge_failed=0
-if [[ ${1:-} == "--purge" ]]; then
-  purge=1
-  shift
-fi
-if (( $# > 0 )); then
-  echo "Usage: scripts/remove-runtime.sh [--purge]" >&2
-  exit 2
-fi
+for arg in "$@"; do
+  case "$arg" in
+  --purge) purge=1 ;;
+  --include-shared) include_shared=1 ;;
+  *)
+    echo "Usage: scripts/remove-runtime.sh [--purge] [--include-shared]" >&2
+    exit 2
+    ;;
+  esac
+done
 
 config_root=${XDG_CONFIG_HOME:-"$HOME/.config"}
 cache_root=${XDG_CACHE_HOME:-"$HOME/.cache"}
@@ -21,8 +24,8 @@ fallback_unit_file="$config_root/systemd/user/omarchy-spotifyd.service"
 # Aria keeps everything it installs inside its own tree. The omarchy-spotify
 # locations are the legacy ones this plugin inherited from its fork point and
 # are also used by the original Omarchy Spotify plugin, so they are only
-# touched when they hold a backend that Aria itself installed (see
-# runtime_is_ours below).
+# touched on positive proof that Aria installed them (see the ownership
+# decision below).
 config_dir="$config_root/aria"
 build_cache_dir="$cache_root/aria"
 aria_state_dir="$state_root/aria"
@@ -33,11 +36,6 @@ legacy_build_cache_dir="$cache_root/omarchy-spotify"
 legacy_state_dir="$state_root/omarchy-spotify"
 legacy_session_runtime_dir="$session_runtime_root/omarchy-spotify"
 legacy_runtime_dir=${OMARCHY_SPOTIFY_RUNTIME_DIR:-"$HOME/.local/lib/omarchy-spotify"}
-# The original Omarchy Spotify plugin (id quickshell.spotify) still uses the
-# shared omarchy-spotify names. Its checkout in the Omarchy plugins folder is
-# the only reliable signal that another live installation may own those files.
-plugins_dir=${OMARCHY_PLUGINS_DIR:-"$HOME/.config/omarchy/plugins"}
-original_plugin_dir="$plugins_dir/quickshell.spotify"
 backend_binary="$runtime_dir/omarchy-spotify-backend"
 backend_source_id_file="$runtime_dir/backend-source.sha256"
 backend_binary_hash_file="$runtime_dir/backend-binary.sha256"
@@ -120,27 +118,48 @@ if [[ -d $config_dir ]]; then
 fi
 
 # Everything under the omarchy-spotify names is shared with the original
-# Omarchy Spotify plugin. Remove it when the backend installed there was put
-# there by Aria, or when the original plugin is not installed so only Aria
-# can have created these files (an upgrade from the shared layout). Otherwise
-# this uninstall must leave the other plugin's backend, configuration, saved
-# sign-in and backups untouched.
+# Omarchy Spotify plugin. They are removed only on positive proof that Aria
+# installed them - the installed-by marker in the legacy runtime directory -
+# or when the operator explicitly asks for it (--include-shared, or the
+# prompt below). A missing checkout proves nothing: Omarchy's plugin manager
+# keeps a removed plugin's data on disk for reinstall, so these files can
+# still belong to the other plugin. When in doubt, this purge keeps them.
 legacy_shared_owned=0
 runtime_is_ours "$legacy_runtime_dir" && legacy_shared_owned=1
-original_plugin_present=0
-if [[ -e $original_plugin_dir || -L $original_plugin_dir ]]; then
-  original_plugin_present=1
+
+legacy_remove_shared=0
+legacy_kept=0
+if (( include_shared )) || (( legacy_shared_owned )); then
+  legacy_remove_shared=1
+elif (( purge )); then
+  shared_paths_present=0
+  for shared_dir in "$legacy_config_dir" "$legacy_build_cache_dir" \
+    "$legacy_state_dir" "$legacy_session_runtime_dir" "$legacy_runtime_dir"; do
+    if [[ -e $shared_dir || -L $shared_dir ]]; then
+      shared_paths_present=1
+      break
+    fi
+  done
+  if (( shared_paths_present )) && [[ -t 0 ]]; then
+    echo "Shared Omarchy Spotify files were found. They may belong to the separately"
+    echo "installed Omarchy Spotify plugin, which keeps a removed plugin's data on disk."
+    prompt_answer=""
+    read -r -p "Remove the shared files as part of this purge? [y/N] " prompt_answer \
+      || prompt_answer=""
+    if [[ $prompt_answer == [yY]* ]]; then
+      legacy_remove_shared=1
+    fi
+  fi
 fi
 
 legacy_may_remove() {
-  if (( legacy_shared_owned )); then return 0; fi
-  (( original_plugin_present )) && return 1
-  return 0
+  (( legacy_remove_shared ))
 }
 
 if [[ -d $legacy_config_dir ]]; then
   if ! legacy_may_remove; then
     echo "Kept shared Omarchy Spotify configuration (the separately installed Omarchy Spotify plugin may still use it)."
+    legacy_kept=1
   elif (( purge )); then
     rm -rf -- "$legacy_config_dir"
     echo "Removed legacy spotifyd configuration."
@@ -166,6 +185,7 @@ if (( purge )); then
       echo "Removed legacy backend build cache."
     else
       echo "Kept shared Omarchy Spotify build cache (the separately installed Omarchy Spotify plugin may still use it)."
+      legacy_kept=1
     fi
   fi
   if [[ -d $legacy_state_dir ]]; then
@@ -174,6 +194,7 @@ if (( purge )); then
       echo "Removed legacy durable playback authorization and session state."
     else
       echo "Kept shared Omarchy Spotify state (the separately installed Omarchy Spotify plugin may still use it)."
+      legacy_kept=1
     fi
   fi
   # The current generation keeps everything plugin-owned under state/aria:
@@ -193,6 +214,7 @@ if (( purge )); then
       echo "Removed legacy playback sockets and temporary receiver state."
     else
       echo "Kept shared Omarchy Spotify runtime directory (the separately installed Omarchy Spotify plugin may still use it)."
+      legacy_kept=1
     fi
   fi
   if [[ -d $runtime_dir ]]; then
@@ -208,6 +230,7 @@ if (( purge )); then
   if [[ -d $legacy_runtime_dir ]]; then
     if ! legacy_may_remove; then
       echo "Kept shared Omarchy Spotify backend (the separately installed Omarchy Spotify plugin may still use it)."
+      legacy_kept=1
     elif [[ ${legacy_runtime_dir##*/} == omarchy-spotify ]]; then
       rm -rf -- "$legacy_runtime_dir"
       echo "Removed legacy installed playback backend."
@@ -224,6 +247,7 @@ if (( purge )); then
       echo "Removed old configuration backup: $backup"
     else
       echo "Kept shared Omarchy Spotify backup: $backup (the separately installed Omarchy Spotify plugin may still use it)"
+      legacy_kept=1
     fi
   done
   for backup in "$config_root"/aria.bak.*; do
@@ -239,6 +263,12 @@ if (( purge )); then
   fi
 else
   rmdir -- "$runtime_dir" 2>/dev/null || true
+fi
+
+if (( purge && legacy_kept )); then
+  echo "Some shared Omarchy Spotify files were kept: they may belong to the separately"
+  echo "installed Omarchy Spotify plugin, which keeps a removed plugin's data on disk."
+  echo "Pass --include-shared if Aria installed them and they should be removed too."
 fi
 
 if (( purge_failed )); then

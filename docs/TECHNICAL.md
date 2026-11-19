@@ -247,12 +247,13 @@ Aria installs only into its own tree (`~/.local/lib/aria`, `~/.config/aria`,
 Aria backend out of the shared `omarchy-spotify` folder it used historically —
 but only when Aria's own install marker is present there, since the original
 Omarchy Spotify plugin builds an identical backend from the same source and
-identity checks alone cannot tell the two apart. Purging never deletes files
-that belong to the original plugin: shared `omarchy-spotify` locations are
-cleared only when Aria's marker proves it installed them, or when the original
-plugin is not installed so only Aria can have created them (an upgrade from
-the shared layout). With the original plugin installed next to Aria, its
-backend, configuration, saved sign-in and backups are left untouched.
+identity checks alone cannot tell the two apart. Shared `omarchy-spotify`
+locations are removed only on positive proof (Aria's marker) or explicit
+consent: `--include-shared`, or a yes at the prompt the purge shows on a
+terminal when shared files exist. Omarchy's plugin manager keeps a removed
+plugin's data on disk and leaves no record, so a missing checkout proves
+nothing; when shared files are kept, the purge prints how to remove them
+deliberately.
 
 Remove that package separately only when it was installed solely for this app:
 

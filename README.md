@@ -243,6 +243,11 @@ It disables and removes the plugin, restarts the shell, and deletes
 plugin-owned configuration, cached artwork, and session state. Your Soloist
 installation and service are yours to keep or remove separately.
 
+If the older shared `omarchy-spotify` files are present, the uninstaller asks
+whether to remove them too (when run from a terminal); pass
+`--include-shared` to decide up front. Aria removes them without asking only
+when its install marker proves it created them.
+
 Aria is an independent project and is not affiliated with Spotify.
 Spotify is a trademark of Spotify AB. Aria is a fork of
 [Omarchy Spotify](https://github.com/stappmus/Omarchy-Spotify) and would not

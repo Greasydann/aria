@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if (( $# > 0 )); then
-  echo "Usage: scripts/uninstall.sh" >&2
+if (( $# > 2 )); then
+  echo "Usage: scripts/uninstall.sh [--include-shared]" >&2
   exit 2
 fi
+include_shared=0
+for arg in "$@"; do
+  case "$arg" in
+  --include-shared) include_shared=1 ;;
+  *)
+    echo "Usage: scripts/uninstall.sh [--include-shared]" >&2
+    exit 2
+    ;;
+  esac
+done
 
 source_root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 plugins_dir="$HOME/.config/omarchy/plugins"
@@ -22,7 +32,11 @@ command -v omarchy >/dev/null 2>&1 || {
 # Disable first so the shell drops its widget and service before the runtime
 # files and plugin checkout disappear. This is intentionally safe to repeat.
 omarchy plugin disable aria >/dev/null 2>&1 || true
-"$source_root/scripts/remove-runtime.sh" --purge
+purge_args=(--purge)
+if (( include_shared )); then
+  purge_args+=(--include-shared)
+fi
+"$source_root/scripts/remove-runtime.sh" "${purge_args[@]}"
 
 if [[ -e $plugin_dir || -L $plugin_dir ]]; then
   omarchy plugin remove aria --yes
@@ -48,5 +62,6 @@ fi
 
 echo "Aria's plugin data, tokens and runtime have been completely uninstalled."
 echo "External source checkouts, other plugins, the spotifyd package, and its"
-echo "own cache were left alone. Shared Omarchy Spotify files that Aria did not"
-echo "install were left alone too."
+echo "own cache were left alone. Shared Omarchy Spotify files Aria did not"
+echo "install were left alone too (pass --include-shared to remove them as"
+echo "well; the uninstaller also asks when run from a terminal)."
