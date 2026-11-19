@@ -31,7 +31,7 @@ it is installed, logging in explains exactly that instead of failing silently:
 
 Setup downloads the release binary for your architecture (x86_64 or aarch64),
 checks its SHA-256 checksum and GitHub build attestation, and installs it
-under `~/.local/lib/omarchy-spotify/`. If no verified release can be
+under `~/.local/lib/aria/`. If no verified release can be
 downloaded, it falls back to a locked source build, which needs the Rust
 toolchain pinned in `rust-toolchain.toml` (`rustup` fetches it), `cargo`,
 and a network connection. Set `OMARCHY_SPOTIFY_BUILD_FROM_SOURCE=1` to skip

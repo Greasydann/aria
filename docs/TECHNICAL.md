@@ -73,7 +73,7 @@ Configuration, verified downloads, and local builds need no privilege.
 
 Omarchy treats any write inside a plugin directory as a change to the plugin and
 hot-reloads it, so the backend is compiled to
-`$XDG_CACHE_HOME/omarchy-spotify/target` (override with `CARGO_TARGET_DIR`),
+`$XDG_CACHE_HOME/aria/target` (override with `CARGO_TARGET_DIR`),
 never to the plugin directory itself. This keeps the recursive file watcher
 from reloading the plugin — and killing the build — mid-setup. A stale
 `backend/target/` left by an older build can be removed; the backend ignores it.
@@ -237,6 +237,14 @@ caches, sockets, backups, and keyring entries. See the README's
 **Remove it completely** section for the equivalent commands and legacy
 keybinding check. The `spotifyd` package remains installed because another
 client may use it.
+
+Aria installs only into its own tree (`~/.local/lib/aria`, `~/.config/aria`,
+`$XDG_CACHE_HOME/aria`, `$XDG_STATE_HOME/aria`), and setup moves an older
+Aria backend out of the shared `omarchy-spotify` folder it used historically.
+Purging therefore never deletes files that belong to the original Omarchy
+Spotify plugin: shared locations are cleared only when the backend installed
+there was put there by Aria (checked by its identity files, install marker or
+attested-release commit).
 
 Remove that package separately only when it was installed solely for this app:
 

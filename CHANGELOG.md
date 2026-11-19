@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.12 (2026-11-19)
+
+- Keep the uninstall from touching another plugin's files: Aria now installs
+  into its own `aria` runtime, configuration, cache and session directories, and
+  setup migrates an older Aria backend out of the shared Omarchy Spotify folder.
+  The purge deletes shared legacy paths only when the backend there was
+  installed by Aria, so uninstalling Aria can never remove the original Omarchy
+  Spotify player's backend, configuration, saved sign-in or backups.
+
+
 ## 1.2.11 (2026-11-18)
 
 - Fix the thin ghost line behind the mini player's volume bar: a mangled layout

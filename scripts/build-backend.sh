@@ -3,7 +3,7 @@ set -euo pipefail
 
 source_root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 manifest="$source_root/backend/Cargo.toml"
-runtime_dir=${OMARCHY_SPOTIFY_RUNTIME_DIR:-"$HOME/.local/lib/omarchy-spotify"}
+runtime_dir=${ARIA_RUNTIME_DIR:-${OMARCHY_SPOTIFY_RUNTIME_DIR:-"$HOME/.local/lib/aria"}}
 destination="$runtime_dir/omarchy-spotify-backend"
 source_id_file="$runtime_dir/backend-source.sha256"
 binary_hash_file="$runtime_dir/backend-binary.sha256"
@@ -16,7 +16,7 @@ workflow_identity="https://github.com/$repository/.github/workflows/release-back
 # file inside it changes, so an in-place backend/target/ makes its recursive
 # watcher unload and reload the plugin for every Cargo write, killing the build.
 cache_root=${XDG_CACHE_HOME:-"$HOME/.cache"}
-target_dir=${CARGO_TARGET_DIR:-"$cache_root/omarchy-spotify/target"}
+target_dir=${CARGO_TARGET_DIR:-"$cache_root/aria/target"}
 temporary=""
 download_dir=""
 release_asset=""
@@ -41,6 +41,12 @@ write_atomic() {
   chmod 600 "$temporary"
   mv -f -- "$temporary" "$destination_file"
   temporary=""
+}
+
+# Record who installed this backend. remove-runtime.sh refuses to delete the
+# shared omarchy-spotify location without it (or matching identity files).
+mark_installed_by_aria() {
+  printf 'aria\n' > "$runtime_dir/installed-by"
 }
 
 install_backend() {
@@ -124,6 +130,7 @@ download_verified_release() {
 if [[ ${OMARCHY_SPOTIFY_BUILD_FROM_SOURCE:-0} != 1 ]]; then
   if download_verified_release; then
     install_backend "$verified_release" "attested-release:$verified_commit"
+    mark_installed_by_aria
     printf 'Installed verified playback backend: %s\n' "$destination"
     exit 0
   else
@@ -150,4 +157,5 @@ source_date_epoch=$(git -C "$source_root" log -1 --format=%ct 2>/dev/null || pri
     cargo build --locked --release --manifest-path "$manifest"
 )
 install_backend "$target_dir/release/omarchy-spotify-backend" "source-build:$source_id"
+mark_installed_by_aria
 printf 'Built and installed playback backend: %s\n' "$destination"

@@ -172,7 +172,7 @@ runtime_config="$test_root/runtime-config"
 runtime_cache="$test_root/runtime-cache"
 runtime_state="$test_root/runtime-state"
 runtime_session="$test_root/runtime-session"
-runtime_backend="$test_root/runtime-lib/omarchy-spotify"
+runtime_backend="$test_root/runtime-lib/aria"
 runtime_home="$test_root/runtime-home"
 mock_target="$test_root/mock-target"
 secret_log="$test_root/secret-tool.log"
@@ -227,7 +227,7 @@ env "${sandbox_env[@]}" \
   "OMARCHY_SPOTIFY_SKIP_BACKEND_BUILD=1" \
   "$source_root/scripts/setup.sh" --device-name "Test speakers" \
   >"$test_root/setup-fresh.log"
-runtime_config_dir="$runtime_config/omarchy-spotify"
+runtime_config_dir="$runtime_config/aria"
 runtime_spotify_config="$runtime_config_dir/spotifyd.conf"
 [[ -f $runtime_spotify_config ]]
 [[ $(stat -c '%a' "$runtime_spotify_config") == 600 ]]
@@ -336,7 +336,7 @@ grep -q 'identity files are missing' "$test_root/verify-missing-identity.out"
 
 # A missing binary produces the install hint with the request id echoed back
 # (fallback id 1 when the line carries none).
-native_missing_dir="$test_root/runtime-lib-native/omarchy-spotify"
+native_missing_dir="$test_root/runtime-lib-native/aria"
 mkdir -p "$native_missing_dir"
 native_missing_output=$(printf '{"id":4,"command":"login"}\n' |
   env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
@@ -365,7 +365,7 @@ printf '%s\n' stale >"$runtime_cache/spotifyd/cached-file"
 env "${sandbox_env[@]}" \
   "$source_root/scripts/remove-runtime.sh" >"$test_root/remove-plain.log"
 grep -q 'Moved configuration to:' "$test_root/remove-plain.log"
-find "$runtime_config" -maxdepth 1 -type d -name 'omarchy-spotify.bak.*' |
+find "$runtime_config" -maxdepth 1 -type d -name 'aria.bak.*' |
   grep -q .
 [[ ! -e $runtime_backend/omarchy-spotify-backend ]]
 [[ -f $runtime_state/aria/refresh-token-mock ]]
@@ -404,7 +404,7 @@ grep -q 'kept modified unit file' "$test_root/remove-purge.err"
 [[ ! -e $runtime_session/omarchy-spotify ]]
 [[ ! -e $runtime_backend ]]
 grep -q 'Removed plugin tokens and session state.' "$test_root/remove-purge.log"
-grep -q 'Removed spotifyd configuration.' "$test_root/remove-purge.log"
+grep -q 'Removed legacy spotifyd configuration.' "$test_root/remove-purge.log"
 grep -q 'Cleared matching Aria keyring entries.' "$test_root/remove-purge.log"
 grep -q 'clear service aria kind refresh-token' "$secret_log"
 # The shared spotifyd cache belongs to the spotifyd package, not this plugin.
@@ -444,7 +444,10 @@ grep -q 'some plugin files could not be deleted' "$test_root/remove-failed.err"
 plugin_dir="$runtime_home/.config/omarchy/plugins/aria"
 plugin_backup="$runtime_home/.config/omarchy/plugins/.aria.bak.20260827000000"
 mkdir -p "$(dirname -- "$plugin_dir")" "$plugin_backup" \
-  "$runtime_config/omarchy-spotify" "$runtime_state/aria"
+  "$runtime_config/omarchy-spotify" "$runtime_state/aria" "$runtime_backend"
+# The purge above removed the whole runtime dir; an install-by-Aria marker is
+# what lets the uninstaller take the shared Omarchy Spotify files with it.
+printf '%s\n' 'aria' >"$runtime_backend/installed-by"
 ln -s -- "$source_root" "$plugin_dir"
 printf '%s\n' stale >"$runtime_config/omarchy-spotify/spotifyd.conf"
 printf '%s\n' stale >"$runtime_state/aria/refresh-token-mock"
@@ -466,6 +469,74 @@ env "${sandbox_env[@]}" \
   "TEST_OMARCHY_LOG=$omarchy_log" \
   "$source_root/scripts/uninstall.sh" >/dev/null 2>&1
 [[ $(grep -c '^plugin remove aria --yes$' "$omarchy_log") -eq 1 ]]
+
+# A purge never touches shared Omarchy Spotify files that Aria did not
+# install: a foreign (or missing) backend identity leaves every legacy path
+# in place while Aria's own state is still removed.
+never_setup_legacy="$test_root/runtime-lib-foreign/omarchy-spotify"
+never_setup_aria="$test_root/runtime-lib-foreign/aria"
+mkdir -p "$never_setup_legacy" "$never_setup_aria" \
+  "$runtime_config/omarchy-spotify" "$runtime_state/omarchy-spotify" \
+  "$runtime_cache/omarchy-spotify/target" "$runtime_session/omarchy-spotify" \
+  "$runtime_state/aria"
+printf '%s\n' 'not aria' >"$never_setup_legacy/omarchy-spotify-backend"
+chmod 755 "$never_setup_legacy/omarchy-spotify-backend"
+printf '%s\n' 'stale' >"$runtime_config/omarchy-spotify/spotifyd.conf"
+printf '%s\n' stale >"$runtime_cache/omarchy-spotify/target/build-artifact"
+printf '%s\n' stale >"$runtime_session/omarchy-spotify/backend.sock"
+printf '%s\n' '{"token":"other-plugin"}' >"$runtime_state/omarchy-spotify/refresh-token"
+printf '%s\n' '{"token":"mock"}' >"$runtime_state/aria/refresh-token-mock"
+env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
+  "XDG_CONFIG_HOME=$runtime_config" "XDG_CACHE_HOME=$runtime_cache" \
+  "XDG_STATE_HOME=$runtime_state" "XDG_RUNTIME_DIR=$runtime_session" \
+  "ARIA_RUNTIME_DIR=$never_setup_aria" \
+  "OMARCHY_SPOTIFY_RUNTIME_DIR=$never_setup_legacy" \
+  "$source_root/scripts/remove-runtime.sh" --purge \
+  >"$test_root/remove-foreign.log" 2>&1
+[[ -x $never_setup_legacy/omarchy-spotify-backend ]]
+[[ -f $runtime_config/omarchy-spotify/spotifyd.conf ]]
+[[ -f $runtime_cache/omarchy-spotify/target/build-artifact ]]
+[[ -f $runtime_session/omarchy-spotify/backend.sock ]]
+[[ -f $runtime_state/omarchy-spotify/refresh-token ]]
+[[ ! -e $runtime_state/aria ]]
+grep -q 'Kept shared Omarchy Spotify' "$test_root/remove-foreign.log"
+grep -q 'Removed plugin tokens and session state.' "$test_root/remove-foreign.log"
+rm -rf -- "$never_setup_legacy" "$never_setup_aria" \
+  "$runtime_config/omarchy-spotify" "$runtime_state/omarchy-spotify" \
+  "$runtime_cache/omarchy-spotify" "$runtime_session/omarchy-spotify"
+
+# An Aria-owned backend found at the shared legacy location is migrated into
+# Aria's own tree by setup, together with its private configuration.
+migration_legacy="$test_root/runtime-lib-migration/omarchy-spotify"
+migration_aria="$test_root/runtime-lib-migration/aria"
+mkdir -p "$migration_legacy"
+# An old install had only the legacy override; the backend lands there.
+env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
+  "XDG_CONFIG_HOME=$runtime_config" "XDG_CACHE_HOME=$runtime_cache" \
+  "XDG_STATE_HOME=$runtime_state" "XDG_RUNTIME_DIR=$runtime_session" \
+  "OMARCHY_SPOTIFY_RUNTIME_DIR=$migration_legacy" \
+  "CARGO_TARGET_DIR=$mock_target" \
+  "OMARCHY_SPOTIFY_BUILD_FROM_SOURCE=1" \
+  "$source_root/scripts/build-backend.sh" >/dev/null
+mkdir -p "$runtime_config/omarchy-spotify"
+printf 'device_name = "Aria"\n' >"$runtime_config/omarchy-spotify/spotifyd.conf"
+env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
+  "XDG_CONFIG_HOME=$runtime_config" "XDG_CACHE_HOME=$runtime_cache" \
+  "XDG_STATE_HOME=$runtime_state" "XDG_RUNTIME_DIR=$runtime_session" \
+  "ARIA_RUNTIME_DIR=$migration_aria" \
+  "OMARCHY_SPOTIFY_RUNTIME_DIR=$migration_legacy" \
+  "$source_root/scripts/setup.sh" >"$test_root/setup-migration.log" 2>&1
+grep -q "Moved Aria's backend out of the shared Omarchy Spotify folder." \
+  "$test_root/setup-migration.log"
+grep -q "Moved Aria's configuration out of the shared Omarchy Spotify folder." \
+  "$test_root/setup-migration.log"
+[[ -x $migration_aria/omarchy-spotify-backend ]]
+[[ $(<"$migration_aria/installed-by") == 'aria' ]]
+[[ ! -e $migration_legacy/omarchy-spotify-backend ]]
+grep -q 'Keeping existing configuration' "$test_root/setup-migration.log"
+# The private configuration moves to Aria's config tree, not the runtime dir.
+[[ -f $runtime_config/aria/spotifyd.conf ]]
+[[ ! -e $runtime_config/omarchy-spotify ]]
 
 # Static checks keep the scripts honest about the current architecture.
 grep -q 'remove-runtime.sh.*--purge' "$source_root/scripts/uninstall.sh"

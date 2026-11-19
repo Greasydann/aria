@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 umask 077
-runtime_dir=${OMARCHY_SPOTIFY_RUNTIME_DIR:-"$HOME/.local/lib/omarchy-spotify"}
+runtime_dir=${ARIA_RUNTIME_DIR:-${OMARCHY_SPOTIFY_RUNTIME_DIR:-"$HOME/.local/lib/aria"}}
 config_root=${XDG_CONFIG_HOME:-"$HOME/.config"}
 export RUST_LOG=error
 
@@ -33,4 +33,4 @@ if [ -n "$backend_error" ]; then
   echo "native-session.sh: $detail; run scripts/setup.sh" >&2
   exit 7
 fi
-exec "$backend" session --config-path "$config_root/omarchy-spotify/spotifyd.conf"
+exec "$backend" session --config-path "$config_root/aria/spotifyd.conf"

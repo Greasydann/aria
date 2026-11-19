@@ -48,4 +48,5 @@ fi
 
 echo "Aria's plugin data, tokens and runtime have been completely uninstalled."
 echo "External source checkouts, other plugins, the spotifyd package, and its"
-echo "own cache were left alone."
+echo "own cache were left alone. Shared Omarchy Spotify files that Aria did not"
+echo "install were left alone too."

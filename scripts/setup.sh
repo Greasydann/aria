@@ -73,12 +73,39 @@ done
 }
 
 config_root=${XDG_CONFIG_HOME:-"$HOME/.config"}
-config_dir="$config_root/omarchy-spotify"
+# Aria keeps its configuration and backend in its own tree. The omarchy-spotify
+# names are the legacy locations shared with the original Omarchy Spotify
+# plugin; an Aria-owned install found there is migrated out (see below) so a
+# later uninstall of either plugin cannot disturb the other.
+config_dir="$config_root/aria"
 config_file="$config_dir/spotifyd.conf"
 
-backend_binary=${OMARCHY_SPOTIFY_RUNTIME_DIR:-"$HOME/.local/lib/omarchy-spotify"}/omarchy-spotify-backend
+backend_binary=${ARIA_RUNTIME_DIR:-${OMARCHY_SPOTIFY_RUNTIME_DIR:-"$HOME/.local/lib/aria"}}/omarchy-spotify-backend
 runtime_dir=$(dirname -- "$backend_binary")
 backend_ready=0
+
+legacy_runtime_dir=${OMARCHY_SPOTIFY_RUNTIME_DIR:-"$HOME/.local/lib/omarchy-spotify"}
+if [[ ! -x $backend_binary && -x $legacy_runtime_dir/omarchy-spotify-backend ]] \
+    && "$source_root/scripts/backend-verify.sh" \
+      "$legacy_runtime_dir/omarchy-spotify-backend" "$source_root" >/dev/null 2>&1; then
+  install -d -m 700 -- "$runtime_dir"
+  for legacy_file in omarchy-spotify-backend backend-source.sha256 \
+      backend-binary.sha256 backend-origin; do
+    if [[ -e $legacy_runtime_dir/$legacy_file ]]; then
+      mv -- "$legacy_runtime_dir/$legacy_file" "$runtime_dir/$legacy_file"
+    fi
+  done
+  printf 'aria\n' > "$runtime_dir/installed-by"
+  echo "Moved Aria's backend out of the shared Omarchy Spotify folder."
+  if [[ -f $config_root/omarchy-spotify/spotifyd.conf && ! -e $config_file ]]; then
+    install -d -m 700 -- "$config_dir"
+    mv -- "$config_root/omarchy-spotify/spotifyd.conf" "$config_file"
+    # Only clears the folder when nothing else (another plugin's config)
+    # still lives there.
+    rmdir -- "$config_root/omarchy-spotify" 2>/dev/null || true
+    echo "Moved Aria's configuration out of the shared Omarchy Spotify folder."
+  fi
+fi
 
 backend_install_is_current() {
   # Shared with native-session.sh, which re-runs the same verification before
@@ -141,6 +168,8 @@ else
 fi
 
 if (( backend_ready )); then
+  install -d -m 700 -- "$runtime_dir"
+  printf 'aria\n' > "$runtime_dir/installed-by"
   echo "Session backend ready: $backend_binary"
 fi
 echo "Playback remains stopped and will be started on demand by the plugin."
