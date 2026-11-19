@@ -60,23 +60,14 @@ fi
 
 plugin_dir=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 
-# True when a directory holds a backend that Aria installed. Recent installs
-# record that directly; older ones are recognised by the backend identity
-# matching this checkout, or by an attested-release commit that exists in this
-# checkout's history (a commit from another repository never does, so a
-# backend installed by the original Omarchy Spotify plugin is never claimed).
+# True when a directory holds a backend that Aria installed. The only reliable
+# record is the installed-by marker Aria's installer writes: the original
+# Omarchy Spotify plugin builds from the same source lineage, so identity
+# checks against this checkout cannot tell the two apart. A shared directory
+# without the marker belongs to the other plugin and is never removed.
 runtime_is_ours() {
-  local dir=$1 origin sha
-  [[ -f "$dir/installed-by" ]]     && grep -q '^aria' "$dir/installed-by" 2>/dev/null && return 0
-  [[ -x "$dir/omarchy-spotify-backend" ]] \
-    && "$plugin_dir/scripts/backend-verify.sh" \
-      "$dir/omarchy-spotify-backend" "$plugin_dir" >/dev/null 2>&1 && return 0
-  [[ -f "$dir/backend-origin" ]] || return 1
-  origin=$(head -n 1 -- "$dir/backend-origin" 2>/dev/null) || origin=""
-  sha=${origin#attested-release:}
-  [[ -n $sha && $sha != "$origin" && $sha =~ ^[0-9a-f]{40}$ ]] || return 1
-  [[ -d "$plugin_dir/.git" ]] || return 1
-  git -C "$plugin_dir" cat-file -e "$sha^{commit}" 2>/dev/null
+  local dir=$1
+  [[ -f "$dir/installed-by" ]] && grep -q '^aria' "$dir/installed-by" 2>/dev/null
 }
 
 # Legacy units from the embedded-engine generations of this plugin. Current

@@ -520,6 +520,11 @@ env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
   "$source_root/scripts/build-backend.sh" >/dev/null
 mkdir -p "$runtime_config/omarchy-spotify"
 printf 'device_name = "Aria"\n' >"$runtime_config/omarchy-spotify/spotifyd.conf"
+# The migration generation stored the session credentials under the shared
+# name; setup adopts them by copy so both plugins keep working.
+mkdir -p "$runtime_state/omarchy-spotify"
+printf 'legacy-oauth' >"$runtime_state/omarchy-spotify/oauth"
+printf 'legacy-zeroconf' >"$runtime_state/omarchy-spotify/zeroconf"
 env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
   "XDG_CONFIG_HOME=$runtime_config" "XDG_CACHE_HOME=$runtime_cache" \
   "XDG_STATE_HOME=$runtime_state" "XDG_RUNTIME_DIR=$runtime_session" \
@@ -537,6 +542,61 @@ grep -q 'Keeping existing configuration' "$test_root/setup-migration.log"
 # The private configuration moves to Aria's config tree, not the runtime dir.
 [[ -f $runtime_config/aria/spotifyd.conf ]]
 [[ ! -e $runtime_config/omarchy-spotify ]]
+
+# The saved sign-in is adopted by copy: Aria's state folder gets its own
+# credential files and the original plugin's credentials stay in place.
+[[ $(<"$runtime_state/aria/oauth") == 'legacy-oauth' ]]
+[[ $(<"$runtime_state/aria/zeroconf") == 'legacy-zeroconf' ]]
+[[ $(stat -c %a "$runtime_state/aria") == 700 ]]
+[[ $(stat -c %a "$runtime_state/aria/oauth") == 600 ]]
+[[ $(stat -c %a "$runtime_state/aria/zeroconf") == 600 ]]
+[[ $(<"$runtime_state/omarchy-spotify/oauth") == 'legacy-oauth' ]]
+[[ -f $runtime_state/omarchy-spotify/zeroconf ]]
+grep -q "Copied the saved sign-in into Aria's own state folder." \
+  "$test_root/setup-migration.log"
+
+# A later setup run keeps both trees: nothing is moved and nothing is
+# re-copied now that Aria's own credentials exist.
+env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
+  "XDG_CONFIG_HOME=$runtime_config" "XDG_CACHE_HOME=$runtime_cache" \
+  "XDG_STATE_HOME=$runtime_state" "XDG_RUNTIME_DIR=$runtime_session" \
+  "ARIA_RUNTIME_DIR=$migration_aria" \
+  "OMARCHY_SPOTIFY_SKIP_BACKEND_BUILD=1" \
+  "$source_root/scripts/setup.sh" >"$test_root/setup-migration-again.log" 2>&1
+grep -q 'Session backend ready' "$test_root/setup-migration-again.log"
+! grep -q "Copied the saved sign-in" "$test_root/setup-migration-again.log"
+! grep -q "Moved Aria's backend" "$test_root/setup-migration-again.log"
+[[ $(<"$runtime_state/aria/oauth") == 'legacy-oauth' ]]
+
+# The original Omarchy Spotify builds from the same source lineage, so its
+# backend passes Aria's identity checks. Without Aria's installed-by marker
+# setup must leave the shared backend and configuration alone.
+notours_legacy="$test_root/runtime-lib-notours/omarchy-spotify"
+notours_aria="$test_root/runtime-lib-notours/aria"
+mkdir -p "$notours_legacy"
+env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
+  "XDG_CONFIG_HOME=$runtime_config" "XDG_CACHE_HOME=$runtime_cache" \
+  "XDG_STATE_HOME=$runtime_state" "XDG_RUNTIME_DIR=$runtime_session" \
+  "OMARCHY_SPOTIFY_RUNTIME_DIR=$notours_legacy" \
+  "CARGO_TARGET_DIR=$mock_target" \
+  "OMARCHY_SPOTIFY_BUILD_FROM_SOURCE=1" \
+  "$source_root/scripts/build-backend.sh" >/dev/null
+rm -f -- "$notours_legacy/installed-by"
+env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
+  "XDG_CONFIG_HOME=$runtime_config" "XDG_CACHE_HOME=$runtime_cache" \
+  "XDG_STATE_HOME=$runtime_state" "XDG_RUNTIME_DIR=$runtime_session" \
+  "ARIA_RUNTIME_DIR=$notours_aria" \
+  "OMARCHY_SPOTIFY_RUNTIME_DIR=$notours_legacy" \
+  "OMARCHY_SPOTIFY_SKIP_BACKEND_BUILD=1" \
+  "$source_root/scripts/setup.sh" >"$test_root/setup-notours.log" 2>&1
+! grep -q "Moved Aria's backend" "$test_root/setup-notours.log"
+! grep -q "Moved Aria's configuration" "$test_root/setup-notours.log"
+[[ -x $notours_legacy/omarchy-spotify-backend ]]
+[[ ! -e $notours_aria/omarchy-spotify-backend ]]
+[[ ! -e $notours_aria/installed-by ]]
+rm -rf -- "$migration_legacy" "$migration_aria" "$notours_legacy" \
+  "$notours_aria" "$runtime_state/aria" "$runtime_state/omarchy-spotify" \
+  "$runtime_config/aria"
 
 # Static checks keep the scripts honest about the current architecture.
 grep -q 'remove-runtime.sh.*--purge' "$source_root/scripts/uninstall.sh"

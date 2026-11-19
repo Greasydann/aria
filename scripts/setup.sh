@@ -79,6 +79,9 @@ config_root=${XDG_CONFIG_HOME:-"$HOME/.config"}
 # later uninstall of either plugin cannot disturb the other.
 config_dir="$config_root/aria"
 config_file="$config_dir/spotifyd.conf"
+state_root=${XDG_STATE_HOME:-"$HOME/.local/state"}
+credentials_dir="$state_root/aria"
+legacy_credentials_dir="$state_root/omarchy-spotify"
 
 backend_binary=${ARIA_RUNTIME_DIR:-${OMARCHY_SPOTIFY_RUNTIME_DIR:-"$HOME/.local/lib/aria"}}/omarchy-spotify-backend
 runtime_dir=$(dirname -- "$backend_binary")
@@ -86,6 +89,7 @@ backend_ready=0
 
 legacy_runtime_dir=${OMARCHY_SPOTIFY_RUNTIME_DIR:-"$HOME/.local/lib/omarchy-spotify"}
 if [[ ! -x $backend_binary && -x $legacy_runtime_dir/omarchy-spotify-backend ]] \
+    && grep -q '^aria' "$legacy_runtime_dir/installed-by" 2>/dev/null \
     && "$source_root/scripts/backend-verify.sh" \
       "$legacy_runtime_dir/omarchy-spotify-backend" "$source_root" >/dev/null 2>&1; then
   install -d -m 700 -- "$runtime_dir"
@@ -105,6 +109,22 @@ if [[ ! -x $backend_binary && -x $legacy_runtime_dir/omarchy-spotify-backend ]] 
     rmdir -- "$config_root/omarchy-spotify" 2>/dev/null || true
     echo "Moved Aria's configuration out of the shared Omarchy Spotify folder."
   fi
+fi
+
+# The session backend stores its Spotify authorization in its own state
+# directory. Upgrades from the shared-layout generations find it under the
+# omarchy-spotify name, which the original Omarchy Spotify plugin may still
+# be using, so adopt it by copying and leave the original in place.
+if [[ -f $legacy_credentials_dir/oauth && ! -e $credentials_dir/oauth ]]; then
+  install -d -m 700 -- "$credentials_dir"
+  for credentials_file in oauth zeroconf; do
+    if [[ -f $legacy_credentials_dir/$credentials_file \
+        && ! -e $credentials_dir/$credentials_file ]]; then
+      install -m 600 -- "$legacy_credentials_dir/$credentials_file" \
+        "$credentials_dir/$credentials_file"
+      echo "Copied the saved sign-in into Aria's own state folder."
+    fi
+  done
 fi
 
 backend_install_is_current() {

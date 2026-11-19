@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.13 (2026-11-19)
+
+- Keep the original Omarchy Spotify plugin safe when both are installed: the
+  shared-folder migration now requires Aria's own install marker (the original
+  plugin builds an identical backend), the purge trusts only that marker, and
+  the backend's credentials, socket and default configuration moved to Aria's
+  own state names, adopting a legacy sign-in by copy so the original plugin
+  keeps working.
+
 ## 1.2.12 (2026-11-19)
 
 - Keep the uninstall from touching another plugin's files: Aria now installs

@@ -103,7 +103,11 @@ settings or diagnostic logs. Old client-scoped keyring entries are untouched.
 Reusable local-playback authorization is stored with owner-only permissions in
 `$XDG_STATE_HOME/aria`; older credentials under `$XDG_CACHE_HOME`
 are accepted once and migrated so clearing disposable caches cannot deauthorize
-this computer. Player preferences (filters, search history, scroll positions,
+this computer. The backend session credentials (`oauth`, `zeroconf`), its
+socket and its default configuration path are all scoped to Aria's own `aria`
+names; an upgrade copies a sign-in saved under the legacy `omarchy-spotify`
+name and leaves the original in place, so the original Omarchy Spotify plugin
+keeps working. Player preferences (filters, search history, scroll positions,
 and similar) are written to `$XDG_STATE_HOME/aria/session.json` so they do not
 pollute Omarchy's `shell.json`. The last page is not part of that state: the
 player opens on the landing page chosen in Settings (For you, Liked Songs,
@@ -240,11 +244,12 @@ client may use it.
 
 Aria installs only into its own tree (`~/.local/lib/aria`, `~/.config/aria`,
 `$XDG_CACHE_HOME/aria`, `$XDG_STATE_HOME/aria`), and setup moves an older
-Aria backend out of the shared `omarchy-spotify` folder it used historically.
-Purging therefore never deletes files that belong to the original Omarchy
-Spotify plugin: shared locations are cleared only when the backend installed
-there was put there by Aria (checked by its identity files, install marker or
-attested-release commit).
+Aria backend out of the shared `omarchy-spotify` folder it used historically —
+but only when Aria's own install marker is present there, since the original
+Omarchy Spotify plugin builds an identical backend from the same source and
+identity checks alone cannot tell the two apart. Purging never deletes files
+that belong to the original plugin: shared locations are cleared only when
+Aria's marker proves it installed them.
 
 Remove that package separately only when it was installed solely for this app:
 

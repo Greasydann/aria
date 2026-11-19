@@ -107,15 +107,18 @@ impl BackendConfig {
     }
 }
 
+// The omarchy-spotify configuration, socket and credential names belong to
+// the original Omarchy Spotify plugin. Aria keeps every file it writes under
+// its own names so the two players never share authorization state.
 pub fn default_config_path() -> PathBuf {
-    config_home().join("omarchy-spotify/spotifyd.conf")
+    config_home().join("aria/spotifyd.conf")
 }
 
 pub fn default_socket_path() -> PathBuf {
     let runtime = env::var_os("XDG_RUNTIME_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(format!("/run/user/{}", unsafe { libc_getuid() })));
-    runtime.join("omarchy-spotify/backend.sock")
+    runtime.join("aria/backend.sock")
 }
 
 fn config_home() -> PathBuf {
@@ -138,7 +141,7 @@ fn default_credentials_root() -> PathBuf {
         .map(PathBuf::from)
         .or_else(|| env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/state")))
         .unwrap_or_else(|| PathBuf::from(".local/state"))
-        .join("omarchy-spotify")
+        .join("aria")
 }
 
 #[cfg(unix)]
