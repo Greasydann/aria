@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "aria",
   "name": "Aria",
-  "version": "1.2.13",
+  "version": "1.2.14",
   "author": "Dann",
   "license": "MIT",
   "description": "A beautiful and minimal Spotify player for the Omarchy bar \u2014 full player, mini player and synced lyrics \u2014 with local playback through your Soloist receiver. Lightweight: about 12 MB installed and ~20 MB of RAM.",

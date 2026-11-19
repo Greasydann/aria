@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.14 (2026-11-19)
+
+- Setup no longer adopts a sign-in saved under the shared omarchy-spotify
+  name: the account is always chosen through Aria's own login flow.
+- A complete uninstall now removes the legacy omarchy-spotify files (including
+  the earlier sign-in) when the original Omarchy Spotify plugin is not
+  installed; with both plugins installed, the original plugin's files stay
+  untouched.
+
 ## 1.2.13 (2026-11-19)
 
 - Keep the original Omarchy Spotify plugin safe when both are installed: the

@@ -475,10 +475,13 @@ env "${sandbox_env[@]}" \
 # in place while Aria's own state is still removed.
 never_setup_legacy="$test_root/runtime-lib-foreign/omarchy-spotify"
 never_setup_aria="$test_root/runtime-lib-foreign/aria"
+# The original Omarchy Spotify plugin installed next to Aria is what keeps
+# the shared files alive in this scenario.
+original_plugin_fixture="$runtime_home/.config/omarchy/plugins/quickshell.spotify"
 mkdir -p "$never_setup_legacy" "$never_setup_aria" \
   "$runtime_config/omarchy-spotify" "$runtime_state/omarchy-spotify" \
   "$runtime_cache/omarchy-spotify/target" "$runtime_session/omarchy-spotify" \
-  "$runtime_state/aria"
+  "$runtime_state/aria" "$original_plugin_fixture"
 printf '%s\n' 'not aria' >"$never_setup_legacy/omarchy-spotify-backend"
 chmod 755 "$never_setup_legacy/omarchy-spotify-backend"
 printf '%s\n' 'stale' >"$runtime_config/omarchy-spotify/spotifyd.conf"
@@ -503,7 +506,41 @@ grep -q 'Kept shared Omarchy Spotify' "$test_root/remove-foreign.log"
 grep -q 'Removed plugin tokens and session state.' "$test_root/remove-foreign.log"
 rm -rf -- "$never_setup_legacy" "$never_setup_aria" \
   "$runtime_config/omarchy-spotify" "$runtime_state/omarchy-spotify" \
-  "$runtime_cache/omarchy-spotify" "$runtime_session/omarchy-spotify"
+  "$runtime_cache/omarchy-spotify" "$runtime_session/omarchy-spotify" \
+  "$original_plugin_fixture"
+
+# With the original plugin NOT installed, the shared omarchy-spotify files
+# can only be Aria's own leftovers (an upgrade from the shared layout), so a
+# full uninstall removes them too - including the earlier sign-in.
+mkdir -p "$never_setup_legacy" "$never_setup_aria" \
+  "$runtime_config/omarchy-spotify" "$runtime_state/omarchy-spotify/oauth" \
+  "$runtime_cache/omarchy-spotify/target" "$runtime_session/omarchy-spotify" \
+  "$runtime_state/aria"
+printf '%s\n' 'not aria' >"$never_setup_legacy/omarchy-spotify-backend"
+chmod 755 "$never_setup_legacy/omarchy-spotify-backend"
+printf '%s\n' stale >"$runtime_config/omarchy-spotify/spotifyd.conf"
+printf '%s\n' stale >"$runtime_cache/omarchy-spotify/target/build-artifact"
+printf '%s\n' stale >"$runtime_session/omarchy-spotify/backend.sock"
+printf '%s\n' '{"token":"aria-upgrade"}' \
+  >"$runtime_state/omarchy-spotify/oauth/credentials.json"
+printf '%s\n' '{"token":"mock"}' >"$runtime_state/aria/refresh-token-mock"
+env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
+  "XDG_CONFIG_HOME=$runtime_config" "XDG_CACHE_HOME=$runtime_cache" \
+  "XDG_STATE_HOME=$runtime_state" "XDG_RUNTIME_DIR=$runtime_session" \
+  "ARIA_RUNTIME_DIR=$never_setup_aria" \
+  "OMARCHY_SPOTIFY_RUNTIME_DIR=$never_setup_legacy" \
+  "$source_root/scripts/remove-runtime.sh" --purge \
+  >"$test_root/remove-aria-only.log" 2>&1
+[[ ! -e $never_setup_legacy ]]
+[[ ! -e $runtime_config/omarchy-spotify ]]
+[[ ! -e $runtime_state/omarchy-spotify ]]
+[[ ! -e $runtime_session/omarchy-spotify ]]
+[[ ! -e $runtime_cache/omarchy-spotify ]]
+[[ ! -e $runtime_state/aria ]]
+grep -q 'Removed legacy durable playback authorization and session state.' \
+  "$test_root/remove-aria-only.log"
+grep -q 'Removed plugin tokens and session state.' \
+  "$test_root/remove-aria-only.log"
 
 # An Aria-owned backend found at the shared legacy location is migrated into
 # Aria's own tree by setup, together with its private configuration.
@@ -521,8 +558,8 @@ env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
 mkdir -p "$runtime_config/omarchy-spotify"
 printf 'device_name = "Aria"\n' >"$runtime_config/omarchy-spotify/spotifyd.conf"
 # The migration generation stored the session credentials under the shared
-# name; setup adopts them by copy so both plugins keep working. Each store
-# is a directory of librespot cache files.
+# name. Each store is a directory of librespot cache files; setup must leave
+# them alone (the original plugin may still be using that sign-in).
 mkdir -p "$runtime_state/omarchy-spotify/oauth" \
   "$runtime_state/omarchy-spotify/zeroconf"
 printf 'legacy-oauth' >"$runtime_state/omarchy-spotify/oauth/credentials.json"
@@ -545,21 +582,16 @@ grep -q 'Keeping existing configuration' "$test_root/setup-migration.log"
 [[ -f $runtime_config/aria/spotifyd.conf ]]
 [[ ! -e $runtime_config/omarchy-spotify ]]
 
-# The saved sign-in is adopted by copy: Aria's state folder gets its own
-# credential stores and the original plugin's credentials stay in place.
-[[ $(<"$runtime_state/aria/oauth/credentials.json") == 'legacy-oauth' ]]
-[[ $(<"$runtime_state/aria/zeroconf/credentials.json") == 'legacy-zeroconf' ]]
-[[ $(stat -c %a "$runtime_state/aria") == 700 ]]
-[[ $(stat -c %a "$runtime_state/aria/oauth") == 700 ]]
-[[ $(stat -c %a "$runtime_state/aria/oauth/credentials.json") == 600 ]]
-[[ $(stat -c %a "$runtime_state/aria/zeroconf") == 700 ]]
+# Setup never adopts the shared sign-in: the account must be chosen through
+# Aria's own login flow, and the original plugin may still be using those
+# credentials.
+! grep -q "Copied the saved sign-in" "$test_root/setup-migration.log"
+[[ ! -e $runtime_state/aria/oauth ]]
+[[ ! -e $runtime_state/aria/zeroconf ]]
 [[ $(<"$runtime_state/omarchy-spotify/oauth/credentials.json") == 'legacy-oauth' ]]
-[[ -f $runtime_state/omarchy-spotify/zeroconf/credentials.json ]]
-grep -q "Copied the saved sign-in into Aria's own state folder." \
-  "$test_root/setup-migration.log"
+[[ $(<"$runtime_state/omarchy-spotify/zeroconf/credentials.json") == 'legacy-zeroconf' ]]
 
-# A later setup run keeps both trees: nothing is moved and nothing is
-# re-copied now that Aria's own credentials exist.
+# A later setup run still moves nothing and copies nothing.
 env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
   "XDG_CONFIG_HOME=$runtime_config" "XDG_CACHE_HOME=$runtime_cache" \
   "XDG_STATE_HOME=$runtime_state" "XDG_RUNTIME_DIR=$runtime_session" \
@@ -569,7 +601,7 @@ env "PATH=$mock_bin:$PATH" "HOME=$runtime_home" \
 grep -q 'Session backend ready' "$test_root/setup-migration-again.log"
 ! grep -q "Copied the saved sign-in" "$test_root/setup-migration-again.log"
 ! grep -q "Moved Aria's backend" "$test_root/setup-migration-again.log"
-[[ $(<"$runtime_state/aria/oauth/credentials.json") == 'legacy-oauth' ]]
+[[ $(<"$runtime_state/omarchy-spotify/oauth/credentials.json") == 'legacy-oauth' ]]
 
 # The original Omarchy Spotify builds from the same source lineage, so its
 # backend passes Aria's identity checks. Without Aria's installed-by marker

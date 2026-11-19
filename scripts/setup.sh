@@ -79,9 +79,6 @@ config_root=${XDG_CONFIG_HOME:-"$HOME/.config"}
 # later uninstall of either plugin cannot disturb the other.
 config_dir="$config_root/aria"
 config_file="$config_dir/spotifyd.conf"
-state_root=${XDG_STATE_HOME:-"$HOME/.local/state"}
-credentials_dir="$state_root/aria"
-legacy_credentials_dir="$state_root/omarchy-spotify"
 
 backend_binary=${ARIA_RUNTIME_DIR:-${OMARCHY_SPOTIFY_RUNTIME_DIR:-"$HOME/.local/lib/aria"}}/omarchy-spotify-backend
 runtime_dir=$(dirname -- "$backend_binary")
@@ -112,23 +109,10 @@ if [[ ! -x $backend_binary && -x $legacy_runtime_dir/omarchy-spotify-backend ]] 
 fi
 
 # The session backend stores its Spotify authorization in its own state
-# directory. Upgrades from the shared-layout generations find it under the
-# omarchy-spotify name, which the original Omarchy Spotify plugin may still
-# be using, so adopt it by copying and leave the original in place. Each
-# credential store is a directory of librespot cache files.
-if [[ -f $legacy_credentials_dir/oauth/credentials.json \
-    && ! -e $credentials_dir/oauth/credentials.json ]]; then
-  install -d -m 700 -- "$credentials_dir" "$credentials_dir/oauth"
-  install -m 600 -- "$legacy_credentials_dir/oauth/credentials.json" \
-    "$credentials_dir/oauth/credentials.json"
-  echo "Copied the saved sign-in into Aria's own state folder."
-fi
-if [[ -f $legacy_credentials_dir/zeroconf/credentials.json \
-    && ! -e $credentials_dir/zeroconf/credentials.json ]]; then
-  install -d -m 700 -- "$credentials_dir/zeroconf"
-  install -m 600 -- "$legacy_credentials_dir/zeroconf/credentials.json" \
-    "$credentials_dir/zeroconf/credentials.json"
-fi
+# directory ($XDG_STATE_HOME/aria). Setup never adopts a sign-in saved under
+# the shared omarchy-spotify name: those credentials may belong to the
+# original Omarchy Spotify plugin, and the account must always be chosen
+# through Aria's own login flow.
 
 backend_install_is_current() {
   # Shared with native-session.sh, which re-runs the same verification before

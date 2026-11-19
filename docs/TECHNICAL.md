@@ -105,9 +105,9 @@ Reusable local-playback authorization is stored with owner-only permissions in
 are accepted once and migrated so clearing disposable caches cannot deauthorize
 this computer. The backend session credentials (`oauth`, `zeroconf`), its
 socket and its default configuration path are all scoped to Aria's own `aria`
-names; an upgrade copies a sign-in saved under the legacy `omarchy-spotify`
-name and leaves the original in place, so the original Omarchy Spotify plugin
-keeps working. Player preferences (filters, search history, scroll positions,
+names. Setup never adopts a sign-in saved under the legacy `omarchy-spotify`
+name: those credentials may belong to the original Omarchy Spotify plugin, and
+the account is always chosen through Aria's own login flow. Player preferences (filters, search history, scroll positions,
 and similar) are written to `$XDG_STATE_HOME/aria/session.json` so they do not
 pollute Omarchy's `shell.json`. The last page is not part of that state: the
 player opens on the landing page chosen in Settings (For you, Liked Songs,
@@ -248,8 +248,11 @@ Aria backend out of the shared `omarchy-spotify` folder it used historically —
 but only when Aria's own install marker is present there, since the original
 Omarchy Spotify plugin builds an identical backend from the same source and
 identity checks alone cannot tell the two apart. Purging never deletes files
-that belong to the original plugin: shared locations are cleared only when
-Aria's marker proves it installed them.
+that belong to the original plugin: shared `omarchy-spotify` locations are
+cleared only when Aria's marker proves it installed them, or when the original
+plugin is not installed so only Aria can have created them (an upgrade from
+the shared layout). With the original plugin installed next to Aria, its
+backend, configuration, saved sign-in and backups are left untouched.
 
 Remove that package separately only when it was installed solely for this app:
 
