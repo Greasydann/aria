@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.11 (2026-11-18)
+
+- Fix the thin ghost line behind the mini player's volume bar: a mangled layout
+  binding collapsed the row's hover-highlight surface to one pixel. The height
+  and visibility bindings are restored, so hovering now highlights the whole
+  row instead of drawing a stray hairline.
+
+
 ## 1.2.10 (2026-11-18)
 
 - Fix the ghosted volume bar on hover: the slider's unfilled track was a

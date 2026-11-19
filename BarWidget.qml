@@ -1356,7 +1356,7 @@ BarWidget {
         id: miniVolumeCursor
         width: parent.width
         height: miniVolumeRow.implicitHeight + Style.space(2)
-          && (!root.spotify || root.spotify.accountConnected)
+        visible: (!root.spotify || root.spotify.accountConnected)
           && root.spotify && root.spotify.hasPlayer
         hasCursor: root.miniCursorActive && root.miniCursor === "volume"
         foreground: root.foreground
